@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+enum Role {
+  user
+  admin
+  head_admin
+}
+
+enum PartCategory {
+  CPU
+  GPU
+  MOTHERBOARD
+  RAM
+  PSU
+  CASE
+  SSD
+  COOLER
+}
+
+enum OrderType {
+  PREBUILT
+  CUSTOM
+}
+
+enum OrderStatus {
+  VERIFICATION
+  PARTS_SOURCED
+  BUILDING
+  HANDED_TO_CARGO
+  DELIVERED_PAID
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  phone        String?
+  role         Role     @default(user)
+  /// Enforces single head_admin via partial unique semantics (only true for one row)
+  isHeadAdmin  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  orders       Order[]
+  listings     UserListing[]
+}
+
+/// Community marketplace listing — users sell PCs or components
+model UserListing {
+  id               String   @id @default(cuid())
+  sellerId         String
+  seller           User     @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  name             String
+  category         String
+  description      String   @default("")
+  priceMkd         Int
+  imageUrl         String?
+  /// Full PC specs (used when category = PC)
+  cpuLabel         String   @default("")
+  coolerLabel      String   @default("")
+  motherboardLabel String   @default("")
+  ramLabel         String   @default("")
+  gpuLabel         String   @default("")
+  ssdLabel         String   @default("")
+  psuLabel         String   @default("")
+  caseLabel        String   @default("")
+  status           String   @default("pending") // pending | active | sold | rejected | hidden
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([sellerId])
+}
+
+model Part {
+  id            String       @id @default(cuid())
+  name          String
+  brand         String
+  category      PartCategory
+  priceMkd      Int
+  stock         Int          @default(0)
+  socket        String?
+  ramType       String?
+  wattage       Int?
+  tdpWatts      Int?
+  pcieSlots     Int?
+  formFactor    String?
+  /// CPU only: retail box includes a stock cooler/fan (false = must buy cooler)
+  includesCooler Boolean     @default(false)
+  imageUrl      String?
+  active        Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  orderItems    OrderItem[]
+}
+
+model Prebuilt {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  name             String
+  description      String
+  cpuLabel         String
+  coolerLabel      String   @default("")
+  motherboardLabel String   @default("")
+  ramLabel         String
+  gpuLabel         String
+  ssdLabel         String
+  psuLabel         String   @default("")
+  caseLabel        String   @default("")
+  priceMkd         Int
+  stock            Int      @default(0)
+  deliveryHours    Int      @default(24)
+  imageUrl         String?
+  /// new = prebuilt catalog; used = refurbished / second-hand listing
+  condition        String   @default("new")
+  conditionGrade   String   @default("")
+  featured         Boolean  @default(true)
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  orders           Order[]
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  trackingCode    String      @unique
+  cargoCode       String?
+  type            OrderType
+  status          OrderStatus @default(VERIFICATION)
+  customerName    String
+  customerPhone   String
+  customerEmail   String?
+  customerAddress String
+  city            String      @default("Скопје")
+  partsCostMkd    Int
+  assemblyFeeMkd  Int         @default(0)
+  selfBuild       Boolean     @default(false)
+  totalMkd        Int
+  paymentMethod   String      @default("COD")
+  verifiedAt      DateTime?
+  notes           String?
+  userId          String?
+  user            User?       @relation(fields: [userId], references: [id])
+  prebuiltId      String?
+  prebuilt        Prebuilt?   @relation(fields: [prebuiltId], references: [id])
+  items           OrderItem[]
+  statusHistory   StatusEvent[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model OrderItem {
+  id       String @id @default(cuid())
+  orderId  String
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  partId   String?
+  part     Part?  @relation(fields: [partId], references: [id])
+  label    String
+  category String
+  priceMkd Int
+  qty      Int    @default(1)
+}
+
+model StatusEvent {
+  id        String      @id @default(cuid())
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    OrderStatus
+  note      String?
+  createdAt DateTime    @default(now())
+}
+
+model SiteSettings {
+  id              Int    @id @default(1)
+  assemblyFeeMkd  Int    @default(2500)
+  currency        String @default("MKD")
+  companyName     String @default("AXON.MK")
+  supportPhone    String @default("+389 70 000 000")
+  supportViber    String @default("+389 70 000 000")
+}

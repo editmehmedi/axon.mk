@@ -1,0 +1,215 @@
+@import "tailwindcss";
+
+:root {
+  --bg-deep: #070b12;
+  --bg-slate: #0d1420;
+  --bg-panel: rgba(18, 28, 44, 0.72);
+  --bg-panel-solid: #121c2c;
+  --border: rgba(94, 234, 212, 0.14);
+  --border-strong: rgba(34, 211, 238, 0.35);
+  --cyan: #22d3ee;
+  --cyan-dim: #0891b2;
+  --mint: #34d399;
+  --text: #e8eef7;
+  --text-muted: #8b9bb4;
+  --danger: #fb7185;
+  --warn: #fbbf24;
+  --glow: 0 0 40px rgba(34, 211, 238, 0.15);
+}
+
+@theme inline {
+  --color-background: var(--bg-deep);
+  --color-foreground: var(--text);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--text);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(34, 211, 238, 0.12), transparent 55%),
+    radial-gradient(900px 500px at 90% 0%, rgba(8, 145, 178, 0.1), transparent 50%),
+    linear-gradient(180deg, #070b12 0%, #0a1220 45%, #070b12 100%);
+  background-attachment: fixed;
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.glass {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--glow), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.glass-strong {
+  background: rgba(12, 20, 34, 0.88);
+  border: 1px solid var(--border-strong);
+  backdrop-filter: blur(20px);
+  box-shadow: var(--glow);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.65rem;
+  padding: 0.7rem 1.15rem;
+  font-weight: 600;
+  font-size: 0.92rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #22d3ee, #0891b2);
+  color: #041018;
+  box-shadow: 0 8px 28px rgba(34, 211, 238, 0.28);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 10px 34px rgba(34, 211, 238, 0.4);
+}
+
+.btn-ghost {
+  background: rgba(34, 211, 238, 0.06);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.btn-ghost:hover {
+  border-color: var(--border-strong);
+  background: rgba(34, 211, 238, 0.12);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #34d399, #059669);
+  color: #042012;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 0.28rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badge-stock {
+  background: rgba(52, 211, 153, 0.12);
+  color: var(--mint);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+}
+
+.badge-out-of-stock {
+  background: rgba(251, 113, 133, 0.14);
+  color: var(--danger);
+  border: 1px solid rgba(251, 113, 133, 0.4);
+}
+
+.badge-cyan {
+  background: rgba(34, 211, 238, 0.1);
+  color: var(--cyan);
+  border: 1px solid rgba(34, 211, 238, 0.3);
+}
+
+.input {
+  width: 100%;
+  border-radius: 0.65rem;
+  border: 1px solid var(--border);
+  background: rgba(7, 11, 18, 0.65);
+  color: var(--text);
+  padding: 0.7rem 0.9rem;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.input:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.15);
+}
+
+.label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+.section-title {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.fade-up {
+  animation: fadeUp 0.55s ease both;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseRing {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(34, 211, 238, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 211, 238, 0);
+  }
+}
+
+.pulse-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: var(--cyan);
+  animation: pulseRing 1.8s infinite;
+}
+
+.grid-noise {
+  background-image:
+    linear-gradient(rgba(34, 211, 238, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 211, 238, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+}

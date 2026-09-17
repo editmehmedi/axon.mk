@@ -1,0 +1,58 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (keep .env.example for Vercel / local setup)
+.env
+.env.*
+!.env.example
+
+# python / local scrape leftovers
+__pycache__/
+*.pyc
+tsconfig.tsbuildinfo
+_probe_*.js
+_find_*.js
+_gj_*.js
+_gjirafa_ram_stock.html
+
+# prisma
+/prisma/*.db
+/prisma/*.db-journal
+/src/generated
+
+# vercel
+.vercel
+
+# user-uploaded product photos
+/public/uploads/*
+!/public/uploads/.gitkeep
+/public/parts/c__Users_*
