@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, DM_Sans, JetBrains_Mono } from "next/font/google";
 import { Navbar } from "@/components/Navbar";
 import { LanguageProvider } from "@/components/LanguageProvider";
@@ -28,6 +28,12 @@ export const metadata: Metadata = {
   title: "AXON.MK — Custom PC Assembly North Macedonia",
   description:
     "Pre-built gaming PCs and custom PC builder with COD delivery in North Macedonia. English · Albanian · Macedonian.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

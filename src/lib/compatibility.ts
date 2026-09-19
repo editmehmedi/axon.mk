@@ -294,11 +294,18 @@ export function selectionPriceMkd(sel: CompatSelection, ramQty = 1, ssdQty = 1):
 
 export function isStepComplete(sel: CompatSelection, category: keyof CompatSelection): boolean {
   if (category === "SSD") {
-    return getSsds(sel).length >= 1 || ssdIsNone(sel);
+    // Storage is optional: no pick (or an explicit skip) still completes the build.
+    return true;
   }
   const v = sel[category];
   if (!v || Array.isArray(v)) return false;
   return true; // real part or None sentinel
+}
+
+/** Empty SSD step → explicit skip so checkout/pricing treat it as “no storage”. */
+export function withOptionalSsdSkipped(sel: CompatSelection): CompatSelection {
+  if (getSsds(sel).length > 0 || ssdIsNone(sel)) return sel;
+  return { ...sel, SSD: [createNonePart("SSD")] };
 }
 
 export function stepHasNone(sel: CompatSelection, category: keyof CompatSelection): boolean {

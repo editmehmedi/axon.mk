@@ -33,6 +33,7 @@ import {
   ssdIsNone,
   ssdQtySlotLimit,
   stepHasNone,
+  withOptionalSsdSkipped,
   type CompatPart,
   type CompatSelection,
 } from "@/lib/compatibility";
@@ -580,8 +581,10 @@ export default function ConfiguratorPage() {
   }
 
   async function beginBuy(sel: CompatSelection = selection) {
-    if (!canBuySelection(sel)) return;
-    if (!(await requireLoginForBuy(sel))) return;
+    const ready = withOptionalSsdSkipped(sel);
+    if (ready !== sel) setSelection(ready);
+    if (!canBuySelection(ready)) return;
+    if (!(await requireLoginForBuy(ready))) return;
     setPricingOpen(false);
     setCheckoutOpen(true);
   }
@@ -621,7 +624,7 @@ export default function ConfiguratorPage() {
       goNext();
       return;
     }
-    const nextSel = ensureStepChoice(selection);
+    const nextSel = withOptionalSsdSkipped(ensureStepChoice(selection));
     setSelection(nextSel);
     void beginBuy(nextSel);
   }
@@ -786,7 +789,7 @@ export default function ConfiguratorPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1600px] px-4 py-10 pb-28 md:px-6 lg:pb-10">
+    <div className="mx-auto max-w-[1600px] px-4 py-10 pb-36 md:px-6 lg:pb-10">
       <div className="mb-8">
         <h1 className="section-title text-3xl md:text-4xl">{t("builder.title")}</h1>
         <p className="mt-2 text-[var(--text-muted)]">{t("builder.desc")}</p>
@@ -835,7 +838,8 @@ export default function ConfiguratorPage() {
               {i + 1}. {t(STEP_KEYS[cat])}
               {cat === "SSD" && selectedSsd && selectedSsdQty > 1 ? ` ×${selectedSsdQty}` : ""}
               {cat === "RAM" && selectedRam && selectedRamQty > 1 ? ` ×${selectedRamQty}` : ""}
-              {stepHasNone(selection, cat as keyof CompatSelection)
+              {stepHasNone(selection, cat as keyof CompatSelection) ||
+              (cat === "SSD" && !selectedSsd)
                 ? ` · ${t("builder.none")}`
                 : ""}
             </button>
@@ -869,7 +873,7 @@ export default function ConfiguratorPage() {
               {BUILDER_STEPS.map((cat) => {
                 const key = cat as keyof CompatSelection;
                 if (key === "SSD") {
-                  if (ssdIsNone(selection)) {
+                  if (ssdIsNone(selection) || !selectedSsd) {
                     return (
                       <div key={cat} className="flex justify-between gap-2">
                         <span className="text-[var(--text-muted)]">
@@ -881,14 +885,6 @@ export default function ConfiguratorPage() {
                     );
                   }
                   const ssd = selectedSsd;
-                  if (!ssd) {
-                    return (
-                      <div key={cat} className="flex justify-between gap-2">
-                        <span className="text-[var(--text-muted)]">{t(STEP_KEYS[cat])}</span>
-                        <span className="shrink-0">—</span>
-                      </div>
-                    );
-                  }
                   const ssdQty = ssdQtyFor(ssd);
                   return (
                     <div key={cat} className="flex justify-between gap-2">
@@ -1052,7 +1048,7 @@ export default function ConfiguratorPage() {
                   : ""}
               </p>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="hidden shrink-0 items-center gap-2 lg:flex">
               <button
                 type="button"
                 onClick={goPrev}
@@ -1085,11 +1081,14 @@ export default function ConfiguratorPage() {
             <p className="mt-2 text-xs text-[var(--mint)]">{t("builder.coolerIncludedHint")}</p>
           )}
           {currentCat === "SSD" && (
-            <p className="mt-2 text-xs text-[var(--text-muted)]">
-              {ssdSlotCount
-                ? t("builder.ssdQtyHintSlots", { count: ssdSlotCount })
-                : t("builder.ssdQtyHint")}
-            </p>
+            <>
+              <p className="mt-2 text-xs text-[var(--mint)]">{t("builder.skipSsdHint")}</p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                {ssdSlotCount
+                  ? t("builder.ssdQtyHintSlots", { count: ssdSlotCount })
+                  : t("builder.ssdQtyHint")}
+              </p>
+            </>
           )}
           {currentCat === "RAM" && (
             <>
@@ -1107,6 +1106,30 @@ export default function ConfiguratorPage() {
           <p className="mt-1 text-[11px] text-[var(--text-muted)]">{t("builder.clickToDeselect")}</p>
 
           <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            {currentCat === "SSD" && (
+              <div
+                role="button"
+                tabIndex={0}
+                aria-pressed={!selectedSsd}
+                onClick={() =>
+                  setSelection((s) => ({ ...s, SSD: [createNonePart("SSD")] }))
+                }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setSelection((s) => ({ ...s, SSD: [createNonePart("SSD")] }));
+                  }
+                }}
+                className={`flex min-h-[9.5rem] cursor-pointer flex-col items-center justify-center rounded-lg border p-3 text-center transition ${
+                  !selectedSsd
+                    ? "border-[var(--cyan)] bg-[rgba(34,211,238,0.1)]"
+                    : "border-[var(--border)] bg-[rgba(7,11,18,0.4)] hover:border-[var(--border-strong)]"
+                }`}
+              >
+                <p className="text-sm font-semibold text-[var(--cyan)]">{t("builder.skipSsd")}</p>
+                <p className="mt-1 text-[11px] text-[var(--text-muted)]">{t("builder.none")}</p>
+              </div>
+            )}
             {pagedOptions.map((part) => {
               const active = isPartActive(part);
               const img = resolvePartImage(part);
@@ -1293,6 +1316,36 @@ export default function ConfiguratorPage() {
       )}
 
       {!pricingOpen && !checkoutOpen && (
+        <nav
+          aria-label={t("builder.stepOf", { step: step + 1, total: BUILDER_STEPS.length })}
+          className="fixed inset-x-0 bottom-0 z-[55] border-t border-[var(--border)] bg-[rgba(7,11,18,0.94)] px-3 pt-2 backdrop-blur-xl lg:hidden"
+          style={{ paddingBottom: "max(0.65rem, env(safe-area-inset-bottom))" }}
+        >
+          <div className="mx-auto flex max-w-[1600px] items-center gap-2">
+            <button
+              type="button"
+              onClick={goPrev}
+              disabled={isFirstStep}
+              className="min-h-12 flex-1 rounded-xl border border-[var(--border)] px-3 text-sm font-semibold text-[var(--text)] transition enabled:active:scale-[0.98] enabled:hover:border-[var(--cyan)] enabled:hover:text-[var(--cyan)] disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              {t("builder.prev")}
+            </button>
+            <p className="shrink-0 text-center text-[11px] tabular-nums text-[var(--text-muted)]">
+              {step + 1}/{BUILDER_STEPS.length}
+            </p>
+            <button
+              type="button"
+              onClick={goNextOrBuy}
+              disabled={isLastStep && !canBuySelection(ensureStepChoice(selection))}
+              className="min-h-12 flex-1 rounded-xl bg-[var(--cyan)] px-3 text-sm font-semibold text-[#041018] transition enabled:active:scale-[0.98] enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              {isLastStep ? t("builder.order") : t("builder.next")}
+            </button>
+          </div>
+        </nav>
+      )}
+
+      {!pricingOpen && !checkoutOpen && (
         <button
           ref={cartBtnRef}
           type="button"
@@ -1304,7 +1357,7 @@ export default function ConfiguratorPage() {
             cartBump ? "cart-catch" : ""
           }`}
           style={{
-            bottom: "max(1rem, env(safe-area-inset-bottom))",
+            bottom: "calc(4.85rem + env(safe-area-inset-bottom, 0px))",
             right: "max(1rem, env(safe-area-inset-right))",
           }}
         >
