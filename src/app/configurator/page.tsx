@@ -99,6 +99,17 @@ const STEP_KEYS: Record<string, string> = {
   SSD: "builder.ssd",
 };
 
+const STEP_SHORT: Record<(typeof BUILDER_STEPS)[number], string> = {
+  CPU: "CPU",
+  COOLER: "COOLER",
+  MOTHERBOARD: "MOTH",
+  RAM: "RAM",
+  GPU: "GPU",
+  PSU: "PSU",
+  CASE: "CASE",
+  SSD: "SSD",
+};
+
 const DEFAULT_FILTERS: PartFilterState = {
   search: "",
   brand: "",
@@ -199,6 +210,7 @@ export default function ConfiguratorPage() {
   const cartBtnRef = useRef<HTMLButtonElement>(null);
   const throwIdRef = useRef(0);
   const cartBumpTimer = useRef<number>(0);
+  const autoNextTimer = useRef<number>(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -540,7 +552,10 @@ export default function ConfiguratorPage() {
   }, [pricingOpen]);
 
   useEffect(() => {
-    return () => window.clearTimeout(cartBumpTimer.current);
+    return () => {
+      window.clearTimeout(cartBumpTimer.current);
+      window.clearTimeout(autoNextTimer.current);
+    };
   }, []);
 
   function persistDraftNow(sel: CompatSelection = selection) {
@@ -611,12 +626,27 @@ export default function ConfiguratorPage() {
   }
 
   function goPrev() {
+    window.clearTimeout(autoNextTimer.current);
     if (step > 0) setStep(step - 1);
   }
 
   function goNext() {
+    window.clearTimeout(autoNextTimer.current);
     setSelection((s) => ensureStepChoice(s));
     if (step < BUILDER_STEPS.length - 1) setStep(step + 1);
+  }
+
+  function jumpToStep(i: number) {
+    window.clearTimeout(autoNextTimer.current);
+    setStep(i);
+  }
+
+  function goNextAfterPick() {
+    if (step >= BUILDER_STEPS.length - 1) return;
+    window.clearTimeout(autoNextTimer.current);
+    autoNextTimer.current = window.setTimeout(() => {
+      setStep((s) => Math.min(s + 1, BUILDER_STEPS.length - 1));
+    }, 280);
   }
 
   function goNextOrBuy() {
@@ -730,6 +760,7 @@ export default function ConfiguratorPage() {
       }
       return pruned;
     });
+    goNextAfterPick();
   }
 
   const selectedGpu =
@@ -789,7 +820,7 @@ export default function ConfiguratorPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1600px] px-4 py-10 pb-36 md:px-6 lg:pb-10">
+    <div className="mx-auto max-w-[1600px] px-4 py-10 pb-44 md:px-6 lg:pb-10">
       <div className="mb-8">
         <h1 className="section-title text-3xl md:text-4xl">{t("builder.title")}</h1>
         <p className="mt-2 text-[var(--text-muted)]">{t("builder.desc")}</p>
@@ -820,13 +851,13 @@ export default function ConfiguratorPage() {
         <p className="mb-4 text-sm text-[var(--text-muted)]">{t("builder.usedHint")}</p>
       )}
 
-      <div className="mb-6 flex flex-wrap gap-2">
+      <div className="mb-6 hidden flex-wrap gap-2 lg:flex">
         {BUILDER_STEPS.map((cat, i) => {
           const filled = stepHasSelection(selection, cat as keyof CompatSelection);
           return (
             <button
               key={cat}
-              onClick={() => setStep(i)}
+              onClick={() => jumpToStep(i)}
               className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
                 i === step
                   ? "bg-[var(--cyan)] text-[#041018]"
@@ -1318,26 +1349,51 @@ export default function ConfiguratorPage() {
       {!pricingOpen && !checkoutOpen && (
         <nav
           aria-label={t("builder.stepOf", { step: step + 1, total: BUILDER_STEPS.length })}
-          className="fixed inset-x-0 bottom-0 z-[55] border-t border-[var(--border)] bg-[rgba(7,11,18,0.94)] px-3 pt-2 backdrop-blur-xl lg:hidden"
-          style={{ paddingBottom: "max(0.65rem, env(safe-area-inset-bottom))" }}
+          className="fixed inset-x-0 bottom-0 z-[55] border-t border-[var(--border)] bg-[rgba(7,11,18,0.94)] px-2 pt-1.5 backdrop-blur-xl lg:hidden"
+          style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
         >
-          <div className="mx-auto flex max-w-[1600px] items-center gap-2">
+          <div className="mx-auto flex max-w-[1600px] gap-0.5">
+            {BUILDER_STEPS.map((cat, i) => {
+              const filled = stepHasSelection(selection, cat as keyof CompatSelection);
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => jumpToStep(i)}
+                  aria-current={i === step ? "step" : undefined}
+                  aria-label={`${i + 1}. ${t(STEP_KEYS[cat])}`}
+                  className={`min-w-0 flex-1 rounded-md px-0.5 py-1 transition ${
+                    i === step
+                      ? "bg-[var(--cyan)] text-[#041018]"
+                      : filled
+                        ? "bg-[rgba(52,211,153,0.15)] text-[var(--mint)]"
+                        : "bg-[rgba(34,211,238,0.06)] text-[var(--text-muted)]"
+                  }`}
+                >
+                  <span className="block text-[8px] font-medium leading-none tabular-nums opacity-75">
+                    {i + 1}
+                  </span>
+                  <span className="mt-0.5 block truncate text-center text-[9px] font-semibold leading-none tracking-tight">
+                    {STEP_SHORT[cat]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="mx-auto mt-1.5 flex max-w-[1600px] items-center gap-2">
             <button
               type="button"
               onClick={goPrev}
               disabled={isFirstStep}
-              className="min-h-12 flex-1 rounded-xl border border-[var(--border)] px-3 text-sm font-semibold text-[var(--text)] transition enabled:active:scale-[0.98] enabled:hover:border-[var(--cyan)] enabled:hover:text-[var(--cyan)] disabled:cursor-not-allowed disabled:opacity-35"
+              className="min-h-11 flex-1 rounded-xl border border-[var(--border)] px-3 text-sm font-semibold text-[var(--text)] transition enabled:active:scale-[0.98] enabled:hover:border-[var(--cyan)] enabled:hover:text-[var(--cyan)] disabled:cursor-not-allowed disabled:opacity-35"
             >
               {t("builder.prev")}
             </button>
-            <p className="shrink-0 text-center text-[11px] tabular-nums text-[var(--text-muted)]">
-              {step + 1}/{BUILDER_STEPS.length}
-            </p>
             <button
               type="button"
               onClick={goNextOrBuy}
               disabled={isLastStep && !canBuySelection(ensureStepChoice(selection))}
-              className="min-h-12 flex-1 rounded-xl bg-[var(--cyan)] px-3 text-sm font-semibold text-[#041018] transition enabled:active:scale-[0.98] enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35"
+              className="min-h-11 flex-1 rounded-xl bg-[var(--cyan)] px-3 text-sm font-semibold text-[#041018] transition enabled:active:scale-[0.98] enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35"
             >
               {isLastStep ? t("builder.order") : t("builder.next")}
             </button>
@@ -1357,7 +1413,7 @@ export default function ConfiguratorPage() {
             cartBump ? "cart-catch" : ""
           }`}
           style={{
-            bottom: "calc(4.85rem + env(safe-area-inset-bottom, 0px))",
+            bottom: "calc(6.75rem + env(safe-area-inset-bottom, 0px))",
             right: "max(1rem, env(safe-area-inset-right))",
           }}
         >
