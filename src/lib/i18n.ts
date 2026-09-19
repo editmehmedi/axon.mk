@@ -268,7 +268,6 @@ const en: Dict = {
   "login.switchToRegister": "No account? Register",
   "login.switchToLogin": "Already have an account? Sign in",
   "login.requiredToBuy": "Sign in to continue your purchase.",
-  "login.back": "← Back",
   "login.error": "Error",
 
   "admin.title": "Admin Console",
@@ -722,7 +721,6 @@ const sq: Dict = {
   "login.switchToRegister": "Nuk ke llogari? Regjistrohu",
   "login.switchToLogin": "Ke llogari? Hyr",
   "login.requiredToBuy": "Hyr për të vazhduar blerjen.",
-  "login.back": "← Kthehu",
   "login.error": "Gabim",
 
   "admin.title": "Admin Console",
@@ -1176,7 +1174,6 @@ const mk: Dict = {
   "login.switchToRegister": "Немаш профил? Регистрација",
   "login.switchToLogin": "Веќе имаш профил? Најава",
   "login.requiredToBuy": "Најави се за да ја продолжиш купувањето.",
-  "login.back": "← Назад",
   "login.error": "Грешка",
 
   "admin.title": "Admin Console",

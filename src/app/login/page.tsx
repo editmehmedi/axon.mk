@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useI18n } from "@/components/LanguageProvider";
 import { safeNextPath } from "@/lib/clientAuth";
@@ -108,10 +107,6 @@ function LoginInner() {
         >
           {mode === "login" ? t("login.switchToRegister") : t("login.switchToLogin")}
         </button>
-
-        <Link href="/" className="mt-4 inline-block text-xs text-[var(--text-muted)]">
-          {t("login.back")}
-        </Link>
       </div>
     </div>
   );
