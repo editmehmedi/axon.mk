@@ -152,6 +152,18 @@ export function Navbar() {
               </Link>
             );
           })}
+          {user && (
+            <Link
+              href="/account"
+              className={`rounded-xl px-3 py-3 text-base font-medium transition ${
+                pathname.startsWith("/account")
+                  ? "bg-[rgba(34,211,238,0.14)] text-[var(--cyan)]"
+                  : "text-[var(--text)] hover:bg-[rgba(34,211,238,0.08)]"
+              }`}
+            >
+              {t("nav.profile")}
+            </Link>
+          )}
           {(user?.role === "admin" || user?.role === "head_admin") && (
             <Link
               href="/admin"
