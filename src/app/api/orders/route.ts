@@ -12,7 +12,7 @@ import {
   MAX_SSD_QTY,
 } from "@/lib/compatibility";
 import { generateTrackingCode, BUILDER_STEPS } from "@/lib/constants";
-import { sendOrderConfirmationEmail } from "@/lib/email";
+import { sendAdminNewOrderEmail, sendOrderConfirmationEmail } from "@/lib/email";
 import { ORDER_NOTE } from "@/lib/orderNotes";
 
 function normalizeListingId(id: string) {
@@ -98,32 +98,38 @@ export async function POST(req: Request) {
         });
       });
 
+      const mailPayload = {
+        to: data.customerEmail,
+        customerName: data.customerName,
+        trackingCode: order.trackingCode,
+        orderType: "PREBUILT" as const,
+        productName: prebuilt.name,
+        lines: [
+          { category: "CPU", label: prebuilt.cpuLabel },
+          { category: "Cooler", label: prebuilt.coolerLabel },
+          { category: "Motherboard", label: prebuilt.motherboardLabel },
+          { category: "RAM", label: prebuilt.ramLabel },
+          { category: "GPU", label: prebuilt.gpuLabel },
+          { category: "SSD", label: prebuilt.ssdLabel },
+          { category: "PSU", label: prebuilt.psuLabel },
+          { category: "Case", label: prebuilt.caseLabel },
+        ].filter((l) => Boolean(l.label?.trim())),
+        partsCostMkd: prebuilt.priceMkd,
+        assemblyFeeMkd: 0,
+        totalMkd: prebuilt.priceMkd,
+        customerPhone: data.customerPhone,
+        customerAddress: data.customerAddress,
+        city: data.city,
+      };
       try {
-        await sendOrderConfirmationEmail({
-          to: data.customerEmail,
-          customerName: data.customerName,
-          trackingCode: order.trackingCode,
-          orderType: "PREBUILT",
-          productName: prebuilt.name,
-          lines: [
-            { category: "CPU", label: prebuilt.cpuLabel },
-            { category: "Cooler", label: prebuilt.coolerLabel },
-            { category: "Motherboard", label: prebuilt.motherboardLabel },
-            { category: "RAM", label: prebuilt.ramLabel },
-            { category: "GPU", label: prebuilt.gpuLabel },
-            { category: "SSD", label: prebuilt.ssdLabel },
-            { category: "PSU", label: prebuilt.psuLabel },
-            { category: "Case", label: prebuilt.caseLabel },
-          ].filter((l) => Boolean(l.label?.trim())),
-          partsCostMkd: prebuilt.priceMkd,
-          assemblyFeeMkd: 0,
-          totalMkd: prebuilt.priceMkd,
-          customerPhone: data.customerPhone,
-          customerAddress: data.customerAddress,
-          city: data.city,
-        });
+        await sendOrderConfirmationEmail(mailPayload);
       } catch (mailErr) {
         console.error("[email] failed to send order confirmation", mailErr);
+      }
+      try {
+        await sendAdminNewOrderEmail(mailPayload);
+      } catch (mailErr) {
+        console.error("[email] failed to send admin order notice", mailErr);
       }
 
       return NextResponse.json({ order });
@@ -375,27 +381,33 @@ export async function POST(req: Request) {
         });
       });
 
+      const mailPayload = {
+        to: data.customerEmail,
+        customerName: data.customerName,
+        trackingCode: order.trackingCode,
+        orderType: "CUSTOM" as const,
+        productName: "Custom PC Build",
+        lines: orderLines.map(({ item: p, qty }) => ({
+          category: p.category,
+          label: `${p.brand ? `${p.brand} ${p.name}` : p.name}${qty > 1 ? ` ×${qty}` : ""}`,
+          priceMkd: p.priceMkd * qty,
+        })),
+        partsCostMkd: partsCost,
+        assemblyFeeMkd,
+        totalMkd,
+        customerPhone: data.customerPhone,
+        customerAddress: data.customerAddress,
+        city: data.city,
+      };
       try {
-        await sendOrderConfirmationEmail({
-          to: data.customerEmail,
-          customerName: data.customerName,
-          trackingCode: order.trackingCode,
-          orderType: "CUSTOM",
-          productName: "Custom PC Build",
-          lines: orderLines.map(({ item: p, qty }) => ({
-            category: p.category,
-            label: `${p.brand ? `${p.brand} ${p.name}` : p.name}${qty > 1 ? ` ×${qty}` : ""}`,
-            priceMkd: p.priceMkd * qty,
-          })),
-          partsCostMkd: partsCost,
-          assemblyFeeMkd,
-          totalMkd,
-          customerPhone: data.customerPhone,
-          customerAddress: data.customerAddress,
-          city: data.city,
-        });
+        await sendOrderConfirmationEmail(mailPayload);
       } catch (mailErr) {
         console.error("[email] failed to send order confirmation", mailErr);
+      }
+      try {
+        await sendAdminNewOrderEmail(mailPayload);
+      } catch (mailErr) {
+        console.error("[email] failed to send admin order notice", mailErr);
       }
 
       return NextResponse.json({ order });

@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { formatMkd } from "@/lib/constants";
+import { prisma } from "@/lib/db";
 
 export type OrderEmailLine = {
   category: string;
@@ -26,6 +27,10 @@ function smtpConfigured(): boolean {
   return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
 }
 
+function smtpUser(): string {
+  return (process.env.SMTP_USER || "").trim();
+}
+
 function createTransport() {
   const port = Number(process.env.SMTP_PORT || 587);
   return nodemailer.createTransport({
@@ -47,6 +52,54 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/** Always From: Name <authenticated Gmail>, never a nested address. */
+function mailFromHeader(): string {
+  const user = smtpUser() || "noreply@axon.mk";
+  return `AXON.MK <${user}>`;
+}
+
+async function sendMail(opts: {
+  to: string | string[];
+  subject: string;
+  text: string;
+  html: string;
+}): Promise<void> {
+  if (!smtpConfigured()) {
+    console.log("[email] SMTP not configured — preview:");
+    console.log({ to: opts.to, subject: opts.subject, text: opts.text });
+    return;
+  }
+
+  const user = smtpUser();
+  const transport = createTransport();
+  await transport.sendMail({
+    from: mailFromHeader(),
+    replyTo: user,
+    envelope: { from: user, to: opts.to },
+    to: opts.to,
+    subject: opts.subject,
+    text: opts.text,
+    html: opts.html,
+  });
+}
+
+async function adminNotifyEmails(): Promise<string[]> {
+  const smtp = smtpUser().toLowerCase();
+  const fromEnv = [process.env.ORDER_NOTIFY_EMAIL, smtp]
+    .map((value) => value?.trim().toLowerCase())
+    .filter((value): value is string => Boolean(value));
+
+  const admins = await prisma.user.findMany({
+    where: { role: { in: ["admin", "head_admin"] } },
+    select: { email: true },
+  });
+  const extra = admins
+    .map((admin) => admin.email.toLowerCase())
+    .filter((email) => !email.endsWith("@axon.mk") || email === smtp);
+
+  return [...new Set([...fromEnv, ...extra])];
+}
+
 function buildOrderEmailHtml(payload: OrderEmailPayload): string {
   const rows = payload.lines
     .map((line) => {
@@ -55,71 +108,46 @@ function buildOrderEmailHtml(payload: OrderEmailPayload): string {
           ? formatMkd(line.priceMkd)
           : "—";
       return `<tr>
-        <td style="padding:8px 10px;border-bottom:1px solid #1e293b;color:#67e8f9;font-size:12px;text-transform:uppercase;">${escapeHtml(line.category)}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #1e293b;color:#e2e8f0;">${escapeHtml(line.label)}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #1e293b;color:#94a3b8;text-align:right;white-space:nowrap;">${escapeHtml(price)}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;font-size:13px;">${escapeHtml(line.category)}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;font-size:13px;">${escapeHtml(line.label)}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:right;white-space:nowrap;">${escapeHtml(price)}</td>
       </tr>`;
     })
     .join("");
 
+  const kind = payload.orderType === "PREBUILT" ? "Pre-built PC" : "Custom build";
+
   return `<!DOCTYPE html>
 <html>
-<body style="margin:0;padding:0;background:#070b12;font-family:Segoe UI,Arial,sans-serif;color:#e2e8f0;">
-  <div style="max-width:640px;margin:0 auto;padding:28px 18px;">
-    <h1 style="margin:0 0 6px;color:#22d3ee;font-size:28px;letter-spacing:0.08em;">AXON.MK</h1>
-    <p style="margin:0 0 22px;color:#94a3b8;font-size:14px;">Order confirmation</p>
-
-    <p style="margin:0 0 10px;font-size:16px;">Hi ${escapeHtml(payload.customerName)},</p>
-    <p style="margin:0 0 18px;color:#94a3b8;font-size:14px;line-height:1.5;">
-      Your order has been received. We will contact you by phone to verify it.
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+  <div style="max-width:600px;margin:0 auto;padding:24px 16px;">
+    <p style="margin:0 0 16px;font-size:16px;font-weight:700;">AXON.MK</p>
+    <p style="margin:0 0 12px;">Hi ${escapeHtml(payload.customerName)},</p>
+    <p style="margin:0 0 16px;line-height:1.5;">
+      You ordered ${escapeHtml(payload.productName)} (${escapeHtml(kind)}).
+      We will call you to confirm. Payment is cash on delivery.
     </p>
-
-    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:16px;margin-bottom:16px;">
-      <p style="margin:0 0 6px;font-size:12px;color:#67e8f9;text-transform:uppercase;letter-spacing:0.06em;">Tracking code</p>
-      <p style="margin:0;font-size:22px;font-weight:700;color:#22d3ee;">${escapeHtml(payload.trackingCode)}</p>
-      <p style="margin:10px 0 0;font-size:14px;color:#e2e8f0;">${escapeHtml(payload.productName)}</p>
-      <p style="margin:4px 0 0;font-size:12px;color:#64748b;">${payload.orderType === "PREBUILT" ? "Pre-built PC" : "Custom build"}</p>
-    </div>
-
-    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:12px;overflow:hidden;margin-bottom:16px;">
-      <table style="width:100%;border-collapse:collapse;">
-        <thead>
-          <tr style="background:#111827;">
-            <th style="padding:10px;text-align:left;font-size:11px;color:#94a3b8;">Part</th>
-            <th style="padding:10px;text-align:left;font-size:11px;color:#94a3b8;">Specs</th>
-            <th style="padding:10px;text-align:right;font-size:11px;color:#94a3b8;">Price</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
-
-    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:16px;margin-bottom:16px;">
-      <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:14px;">
-        <span style="color:#94a3b8;">Parts</span>
-        <span>${escapeHtml(formatMkd(payload.partsCostMkd))}</span>
-      </div>
-      ${
-        payload.assemblyFeeMkd > 0
-          ? `<div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:14px;">
-              <span style="color:#94a3b8;">Assembly</span>
-              <span>${escapeHtml(formatMkd(payload.assemblyFeeMkd))}</span>
-            </div>`
-          : ""
-      }
-      <div style="display:flex;justify-content:space-between;padding-top:10px;border-top:1px solid #1e293b;font-size:16px;font-weight:700;">
-        <span>Total</span>
-        <span style="color:#22d3ee;">${escapeHtml(formatMkd(payload.totalMkd))}</span>
-      </div>
-      <p style="margin:10px 0 0;font-size:12px;color:#64748b;">Payment: Cash on Delivery</p>
-    </div>
-
-    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:16px;margin-bottom:22px;font-size:13px;color:#94a3b8;line-height:1.55;">
-      <p style="margin:0;"><strong style="color:#e2e8f0;">Phone:</strong> ${escapeHtml(payload.customerPhone)}</p>
-      <p style="margin:6px 0 0;"><strong style="color:#e2e8f0;">Address:</strong> ${escapeHtml(payload.customerAddress)}, ${escapeHtml(payload.city)}</p>
-    </div>
-
-    <p style="margin:0;font-size:12px;color:#64748b;">AXON.MK · Custom PC assembly · North Macedonia</p>
+    <p style="margin:0 0 16px;"><strong>Tracking:</strong> ${escapeHtml(payload.trackingCode)}</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+      <thead>
+        <tr>
+          <th style="padding:8px;text-align:left;border-bottom:1px solid #e5e7eb;font-size:13px;">Part</th>
+          <th style="padding:8px;text-align:left;border-bottom:1px solid #e5e7eb;font-size:13px;">Specs</th>
+          <th style="padding:8px;text-align:right;border-bottom:1px solid #e5e7eb;font-size:13px;">Price</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <p style="margin:0 0 6px;">Parts: ${escapeHtml(formatMkd(payload.partsCostMkd))}</p>
+    ${
+      payload.assemblyFeeMkd > 0
+        ? `<p style="margin:0 0 6px;">Assembly: ${escapeHtml(formatMkd(payload.assemblyFeeMkd))}</p>`
+        : ""
+    }
+    <p style="margin:0 0 16px;"><strong>Total: ${escapeHtml(formatMkd(payload.totalMkd))}</strong></p>
+    <p style="margin:0 0 6px;">Phone: ${escapeHtml(payload.customerPhone)}</p>
+    <p style="margin:0 0 20px;">Address: ${escapeHtml(payload.customerAddress)}, ${escapeHtml(payload.city)}</p>
+    <p style="margin:0;font-size:12px;color:#6b7280;">AXON.MK · Custom PC assembly · North Macedonia</p>
   </div>
 </body>
 </html>`;
@@ -135,10 +163,9 @@ function buildOrderEmailText(payload: OrderEmailPayload): string {
     .join("\n");
 
   return [
-    `AXON.MK — Order confirmation`,
-    ``,
     `Hi ${payload.customerName},`,
-    `Your order has been received.`,
+    ``,
+    `You ordered ${payload.productName}.`,
     ``,
     `Tracking: ${payload.trackingCode}`,
     `Product: ${payload.productName}`,
@@ -153,32 +180,107 @@ function buildOrderEmailText(payload: OrderEmailPayload): string {
     ``,
     `Phone: ${payload.customerPhone}`,
     `Address: ${payload.customerAddress}, ${payload.city}`,
+    ``,
+    `AXON.MK`,
   ]
     .filter((x) => x != null)
     .join("\n");
 }
 
-/** Sends order confirmation to the customer (and optional admin BCC). */
+/** Sends order confirmation to the customer. */
 export async function sendOrderConfirmationEmail(payload: OrderEmailPayload): Promise<void> {
-  const subject = `AXON.MK order ${payload.trackingCode} — ${payload.productName}`;
-  const html = buildOrderEmailHtml(payload);
-  const text = buildOrderEmailText(payload);
-  const from = process.env.SMTP_FROM || process.env.SMTP_USER || "noreply@axon.mk";
-  const adminCopy = process.env.ORDER_NOTIFY_EMAIL || process.env.SMTP_USER;
-
-  if (!smtpConfigured()) {
-    console.log("[email] SMTP not configured — order confirmation preview:");
-    console.log({ to: payload.to, subject, text });
-    return;
-  }
-
-  const transport = createTransport();
-  await transport.sendMail({
-    from: `AXON.MK <${from}>`,
+  await sendMail({
     to: payload.to,
-    bcc: adminCopy && adminCopy !== payload.to ? adminCopy : undefined,
-    subject,
+    subject: `You ordered ${payload.productName} — ${payload.trackingCode}`,
+    text: buildOrderEmailText(payload),
+    html: buildOrderEmailHtml(payload),
+  });
+}
+
+/** Sends a new-order alert to support Gmail and every admin account. */
+export async function sendAdminNewOrderEmail(payload: OrderEmailPayload): Promise<void> {
+  const to = await adminNotifyEmails();
+  if (to.length === 0) return;
+
+  const kind = payload.orderType === "PREBUILT" ? "Pre-built PC" : "Custom build";
+  const specs = payload.lines
+    .map((line) => {
+      const price =
+        line.priceMkd != null && line.priceMkd > 0 ? ` — ${formatMkd(line.priceMkd)}` : "";
+      return `- ${line.category}: ${line.label}${price}`;
+    })
+    .join("\n");
+
+  const text = [
+    `New order on AXON.MK`,
+    ``,
+    `Tracking: ${payload.trackingCode}`,
+    `Product: ${payload.productName} (${kind})`,
+    `Total: ${formatMkd(payload.totalMkd)} · Cash on Delivery`,
+    ``,
+    `Customer: ${payload.customerName}`,
+    `Email: ${payload.to}`,
+    `Phone: ${payload.customerPhone}`,
+    `Address: ${payload.customerAddress}, ${payload.city}`,
+    ``,
+    `Specs:`,
+    specs,
+  ].join("\n");
+
+  const html = `<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+  <div style="max-width:600px;margin:0 auto;padding:24px 16px;">
+    <p style="margin:0 0 16px;font-size:16px;font-weight:700;">AXON.MK — New order</p>
+    <p style="margin:0 0 12px;"><strong>Tracking:</strong> ${escapeHtml(payload.trackingCode)}</p>
+    <p style="margin:0 0 12px;"><strong>Product:</strong> ${escapeHtml(payload.productName)} (${escapeHtml(kind)})</p>
+    <p style="margin:0 0 16px;"><strong>Total:</strong> ${escapeHtml(formatMkd(payload.totalMkd))} · Cash on Delivery</p>
+    <p style="margin:0 0 6px;"><strong>Customer:</strong> ${escapeHtml(payload.customerName)}</p>
+    <p style="margin:0 0 6px;"><strong>Email:</strong> ${escapeHtml(payload.to)}</p>
+    <p style="margin:0 0 6px;"><strong>Phone:</strong> ${escapeHtml(payload.customerPhone)}</p>
+    <p style="margin:0 0 16px;"><strong>Address:</strong> ${escapeHtml(payload.customerAddress)}, ${escapeHtml(payload.city)}</p>
+    <pre style="margin:0;font-family:Arial,Helvetica,sans-serif;white-space:pre-wrap;">${escapeHtml(specs)}</pre>
+  </div>
+</body>
+</html>`;
+
+  await sendMail({
+    to,
+    subject: `New order: ${payload.productName} — ${payload.trackingCode}`,
     text,
     html,
   });
+}
+
+export async function sendVerificationEmail(opts: {
+  to: string;
+  name: string;
+  code: string;
+}): Promise<void> {
+  const subject = `${opts.code} is your AXON.MK code`;
+  const text = [
+    `Hi ${opts.name},`,
+    ``,
+    `Your AXON.MK code is ${opts.code}.`,
+    `It expires in 15 minutes.`,
+    ``,
+    `If you did not create an account, you can ignore this message.`,
+    ``,
+    `AXON.MK`,
+  ].join("\n");
+
+  const html = `<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+  <div style="max-width:560px;margin:0 auto;padding:24px 16px;">
+    <p style="margin:0 0 16px;font-size:16px;font-weight:700;">AXON.MK</p>
+    <p style="margin:0 0 12px;">Hi ${escapeHtml(opts.name)},</p>
+    <p style="margin:0 0 16px;line-height:1.5;">Your AXON.MK code is:</p>
+    <p style="margin:0 0 16px;font-size:28px;font-weight:700;letter-spacing:0.12em;">${escapeHtml(opts.code)}</p>
+    <p style="margin:0;font-size:13px;color:#6b7280;">This code expires in 15 minutes. If you did not register, ignore this message.</p>
+  </div>
+</body>
+</html>`;
+
+  await sendMail({ to: opts.to, subject, text, html });
 }

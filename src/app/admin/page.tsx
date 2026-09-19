@@ -89,6 +89,7 @@ type AdminData = {
     imageUrl?: string | null;
     condition?: string;
     conditionGrade?: string;
+    active?: boolean;
   }[];
   users: { id: string; email: string; name: string; role: string; isHeadAdmin: boolean }[];
   settings: { assemblyFeeMkd: number } | null;

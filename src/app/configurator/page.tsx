@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ASSEMBLY_FEE_DEFAULT, BUILDER_STEPS, formatMkd } from "@/lib/constants";
+import { ASSEMBLY_FEE_DEFAULT, BUILDER_STEPS } from "@/lib/constants";
 import {
   checkCompatibility,
   compatibilityFilterHint,
@@ -41,6 +41,7 @@ import { FpsEstimatePanel } from "@/components/FpsEstimatePanel";
 import { BottleneckPanel } from "@/components/BottleneckPanel";
 import { rememberTrackingCode } from "@/components/LiveBuildPipeline";
 import { useI18n } from "@/components/LanguageProvider";
+import { useCurrency } from "@/components/CurrencyProvider";
 import { PartFilters, type PartFilterState } from "@/components/PartFilters";
 import { ProductImage } from "@/components/ProductImage";
 import { resolvePartImage } from "@/lib/partImages";
@@ -170,6 +171,7 @@ function stepHasSelection(sel: CompatSelection, cat: keyof CompatSelection): boo
 
 export default function ConfiguratorPage() {
   const { t } = useI18n();
+  const { formatPrice } = useCurrency();
   const router = useRouter();
   const [condition, setCondition] = useState<"new" | "used">("new");
   const [newParts, setNewParts] = useState<Part[]>([]);
@@ -874,7 +876,7 @@ export default function ConfiguratorPage() {
                           {t(STEP_KEYS[cat])}
                           <span className="text-[var(--text)]"> · {t("builder.none")}</span>
                         </span>
-                        <span className="shrink-0 tabular-nums">{formatMkd(0)}</span>
+                        <span className="shrink-0 tabular-nums">{formatPrice(0)}</span>
                       </div>
                     );
                   }
@@ -899,7 +901,7 @@ export default function ConfiguratorPage() {
                         </span>
                       </span>
                       <span className="shrink-0 tabular-nums">
-                        {formatMkd((ssd.priceMkd ?? 0) * ssdQty)}
+                        {formatPrice((ssd.priceMkd ?? 0) * ssdQty)}
                       </span>
                     </div>
                   );
@@ -924,8 +926,8 @@ export default function ConfiguratorPage() {
                     <span className="shrink-0 tabular-nums">
                       {p
                         ? isNonePart(p)
-                          ? formatMkd(0)
-                          : formatMkd((p.priceMkd ?? 0) * ramQty)
+                          ? formatPrice(0)
+                          : formatPrice((p.priceMkd ?? 0) * ramQty)
                         : "—"}
                     </span>
                   </div>
@@ -934,12 +936,12 @@ export default function ConfiguratorPage() {
               <div className="flex justify-between gap-2 border-t border-[var(--border)] pt-3">
                 <span className="text-[var(--text-muted)]">{t("home.assemblyFee")}</span>
                 <span className="shrink-0 tabular-nums text-[var(--mint)]">
-                  +{formatMkd(fee)}
+                  +{formatPrice(fee)}
                 </span>
               </div>
               <div className="flex justify-between border-t border-[var(--border)] pt-3 text-base font-semibold">
                 <span>{t("home.totalPrice")}</span>
-                <span className="text-[var(--cyan)]">{formatMkd(total)}</span>
+                <span className="text-[var(--cyan)]">{formatPrice(total)}</span>
               </div>
               <div className="space-y-1.5 border-t border-[var(--border)] pt-3">
                 <div className="flex justify-between gap-2">
@@ -1192,8 +1194,8 @@ export default function ConfiguratorPage() {
                   <div className="mt-1.5 flex items-center justify-between gap-1">
                     <span className="text-xs font-medium text-[var(--cyan)]">
                       {showQty && qty > 1
-                        ? `${formatMkd(part.priceMkd)} ×${qty}`
-                        : formatMkd(part.priceMkd)}
+                        ? `${formatPrice(part.priceMkd)} ×${qty}`
+                        : formatPrice(part.priceMkd)}
                     </span>
                     <span className="truncate text-[10px] text-[var(--text-muted)]">
                       {[

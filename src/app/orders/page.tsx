@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { formatMkd, type OrderStatusCode } from "@/lib/constants";
+import { type OrderStatusCode } from "@/lib/constants";
 import { LiveBuildPipeline, rememberTrackingCode } from "@/components/LiveBuildPipeline";
 import { useI18n } from "@/components/LanguageProvider";
+import { useCurrency } from "@/components/CurrencyProvider";
 
 type OrderRow = {
   id: string;
@@ -17,6 +18,7 @@ type OrderRow = {
 
 export default function OrdersPage() {
   const { t } = useI18n();
+  const { formatPrice } = useCurrency();
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,7 +95,7 @@ export default function OrdersPage() {
                       {o.type} · {t(`status.${o.status}`)}
                     </p>
                   </div>
-                  <p className="font-semibold">{formatMkd(o.totalMkd)}</p>
+                  <p className="font-semibold">{formatPrice(o.totalMkd)}</p>
                 </div>
               </button>
             ))}

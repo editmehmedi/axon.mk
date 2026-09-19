@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatMkd } from "@/lib/constants";
 import { fetchSessionUser } from "@/lib/clientAuth";
 import { useI18n } from "./LanguageProvider";
+import { useCurrency } from "./CurrencyProvider";
+import { formatPrice as formatDen } from "@/lib/currency";
 
 type Props = {
   open: boolean;
@@ -21,6 +22,7 @@ type Props = {
 
 export function CheckoutModal({ open, onClose, title, totalMkd, onSubmit }: Props) {
   const { t } = useI18n();
+  const { currency, formatPrice } = useCurrency();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
@@ -100,8 +102,13 @@ export function CheckoutModal({ open, onClose, title, totalMkd, onSubmit }: Prop
           <div className="rounded-xl border border-[var(--border)] bg-[rgba(7,11,18,0.5)] p-3 text-sm">
             <div className="flex justify-between">
               <span className="text-[var(--text-muted)]">{t("checkout.total")}</span>
-              <span className="font-semibold text-[var(--cyan)]">{formatMkd(totalMkd)}</span>
+              <span className="font-semibold text-[var(--cyan)]">{formatPrice(totalMkd)}</span>
             </div>
+            {currency !== "MKD" && (
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
+                {t("checkout.payInDen", { amount: formatDen(totalMkd, "MKD") })}
+              </p>
+            )}
             <p className="mt-2 text-xs text-[var(--text-muted)]">{t("checkout.verifyNote")}</p>
             <p className="mt-1 text-xs text-[var(--mint)]">{t("checkout.emailNote")}</p>
           </div>

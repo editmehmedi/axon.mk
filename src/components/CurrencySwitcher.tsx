@@ -1,16 +1,12 @@
 "use client";
 
-import { LOCALES } from "@/lib/i18n";
+import { CURRENCIES } from "@/lib/currency";
+import { useCurrency } from "./CurrencyProvider";
 import { useI18n } from "./LanguageProvider";
 
-const SHORT_LABEL: Record<string, string> = {
-  en: "English",
-  sq: "Shqip",
-  mk: "MK",
-};
-
-export function LanguageSwitcher({ full = false }: { full?: boolean }) {
-  const { locale, setLocale, t } = useI18n();
+export function CurrencySwitcher({ full = false }: { full?: boolean }) {
+  const { currency, setCurrency } = useCurrency();
+  const { t } = useI18n();
 
   return (
     <div
@@ -19,17 +15,17 @@ export function LanguageSwitcher({ full = false }: { full?: boolean }) {
           ? "grid w-full grid-cols-3 gap-1 rounded-xl border border-[var(--border)] bg-[rgba(7,11,18,0.55)] p-1"
           : "glass inline-flex w-auto shrink-0 items-center gap-0.5 rounded-full p-0.5"
       }
-      title={t("lang.label")}
+      title={t("currency.label")}
       role="group"
-      aria-label={t("lang.label")}
+      aria-label={t("currency.label")}
     >
-      {LOCALES.map((l) => {
-        const active = locale === l.code;
+      {CURRENCIES.map((c) => {
+        const active = currency === c.code;
         return (
           <button
-            key={l.code}
+            key={c.code}
             type="button"
-            onClick={() => setLocale(l.code)}
+            onClick={() => setCurrency(c.code)}
             className={
               full
                 ? `rounded-lg py-2.5 text-center text-sm font-semibold transition ${
@@ -46,13 +42,13 @@ export function LanguageSwitcher({ full = false }: { full?: boolean }) {
           >
             {full ? (
               <span className="flex flex-col items-center leading-tight">
-                <span className="text-base">{l.native}</span>
+                <span className="text-base">{c.native}</span>
                 <span className={`mt-0.5 text-[10px] font-medium ${active ? "opacity-70" : "opacity-50"}`}>
-                  {SHORT_LABEL[l.code] ?? l.native}
+                  {c.code === "MKD" ? "DEN" : c.code}
                 </span>
               </span>
             ) : (
-              l.native
+              c.native
             )}
           </button>
         );

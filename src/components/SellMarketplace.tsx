@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { AdminImageField } from "@/components/AdminImageField";
 import { ProductImage } from "@/components/ProductImage";
 import { useI18n } from "@/components/LanguageProvider";
-import { formatMkd } from "@/lib/constants";
+import { useCurrency } from "@/components/CurrencyProvider";
 import { fetchSessionUser, loginUrl, type ClientUser } from "@/lib/clientAuth";
 import { LISTING_CATEGORIES, type ListingCategory } from "@/lib/listingCategories";
 import { proxiedExternalImage } from "@/lib/partImages";
@@ -349,6 +349,7 @@ function ListingRow({
   onResubmit?: () => void;
   onDelete?: () => void;
 }) {
+  const { formatPrice } = useCurrency();
   const img = item.imageUrl?.trim()
     ? proxiedExternalImage(item.imageUrl.trim())
     : null;
@@ -374,7 +375,7 @@ function ListingRow({
             {statusLabel(t, item.status)}
           </span>
         </div>
-        <p className="mt-1 section-title text-lg text-[var(--cyan)]">{formatMkd(item.priceMkd)}</p>
+        <p className="mt-1 section-title text-lg text-[var(--cyan)]">{formatPrice(item.priceMkd)}</p>
         <div className="mt-2 flex flex-wrap gap-2">
           {item.status === "active" && (
             <button type="button" className="btn btn-ghost !px-2.5 !py-1.5 !text-xs" onClick={onSold}>

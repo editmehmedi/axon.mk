@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { formatMkd } from "@/lib/constants";
 import { resolvePrebuiltImage } from "@/lib/partImages";
 import { ProductImage } from "./ProductImage";
 import { useI18n } from "./LanguageProvider";
+import { useCurrency } from "./CurrencyProvider";
 
 export type PrebuiltCardData = {
   id: string;
@@ -42,6 +42,7 @@ export function PrebuiltCard({
   buyBasePath?: string;
 }) {
   const { t } = useI18n();
+  const { formatPrice } = useCurrency();
   const inStock = pc.stock > 0;
   const img = resolvePrebuiltImage(pc.slug, pc.imageUrl, pc.caseLabel);
 
@@ -122,7 +123,7 @@ export function PrebuiltCard({
         )}
 
         <div className="mt-auto flex items-center justify-between gap-3 pt-2">
-          <p className="section-title text-xl text-[var(--cyan)]">{formatMkd(pc.priceMkd)}</p>
+          <p className="section-title text-xl text-[var(--cyan)]">{formatPrice(pc.priceMkd)}</p>
           {onBuy && !pc.listingId ? (
             <button
               type="button"

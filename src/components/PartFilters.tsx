@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { formatMkd } from "@/lib/constants";
 import { useI18n } from "@/components/LanguageProvider";
+import { useCurrency } from "@/components/CurrencyProvider";
 
 export type PartSort = "name" | "price-asc" | "price-desc";
 
@@ -34,6 +34,7 @@ export function PartFilters({
   resultCount,
 }: Props) {
   const { t } = useI18n();
+  const { formatPrice } = useCurrency();
   const [open, setOpen] = useState(false);
   const span = Math.max(priceBounds.max - priceBounds.min, 1);
 
@@ -158,7 +159,7 @@ export function PartFilters({
             {t("builder.filterPrice")}
           </span>
           <span className="text-[11px] text-[var(--cyan-dim)]">
-            {formatMkd(filters.priceMin)} – {formatMkd(filters.priceMax)}
+            {formatPrice(filters.priceMin)} – {formatPrice(filters.priceMax)}
           </span>
         </div>
 

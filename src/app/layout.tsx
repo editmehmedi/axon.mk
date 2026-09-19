@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Space_Grotesk, DM_Sans, JetBrains_Mono } from "next/font/google";
 import { Navbar } from "@/components/Navbar";
 import { LanguageProvider } from "@/components/LanguageProvider";
+import { CurrencyProvider } from "@/components/CurrencyProvider";
 import { SiteFooter } from "@/components/SiteFooter";
 import "./globals.css";
 
@@ -37,9 +38,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <LanguageProvider>
-          <Navbar />
-          <main className="flex-1">{children}</main>
-          <SiteFooter />
+          <CurrencyProvider>
+            <Navbar />
+            <main className="flex-1">{children}</main>
+            <SiteFooter />
+          </CurrencyProvider>
         </LanguageProvider>
       </body>
     </html>

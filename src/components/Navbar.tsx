@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LanguageSwitcher } from "./LanguageSwitcher";
+import { CurrencySwitcher } from "./CurrencySwitcher";
 import { useI18n } from "./LanguageProvider";
 
 type SessionUser = {
@@ -62,58 +63,69 @@ export function Navbar() {
   return (
     <>
     <header className="sticky top-0 z-[80] border-b border-[var(--border)] bg-[rgba(7,11,18,0.9)] backdrop-blur-xl">
-      <div className="mx-auto flex max-w-7xl items-center gap-2 px-3 py-3 sm:px-4 md:px-6">
-        <button
-          type="button"
-          onClick={() => setMenuOpen((open) => !open)}
-          aria-expanded={menuOpen}
-          aria-controls="site-menu"
-          aria-label={menuOpen ? t("nav.closeMenu") : t("nav.menu")}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--text)] transition hover:bg-[rgba(34,211,238,0.1)] hover:text-[var(--cyan)]"
-        >
-          <span className="sr-only">{menuOpen ? t("nav.closeMenu") : t("nav.menu")}</span>
-          <span className="flex flex-col items-center justify-center" aria-hidden="true">
-            <span
-              className={`block h-0.5 w-[18px] rounded-full bg-current transition ${
-                menuOpen ? "translate-y-[6px] rotate-45" : ""
-              }`}
-            />
-            <span
-              className={`mt-1.5 block h-0.5 w-[18px] rounded-full bg-current transition ${
-                menuOpen ? "opacity-0" : ""
-              }`}
-            />
-            <span
-              className={`mt-1.5 block h-0.5 w-[18px] rounded-full bg-current transition ${
-                menuOpen ? "-translate-y-[6px] -rotate-45" : ""
-              }`}
-            />
-          </span>
-        </button>
+      <div className="mx-auto max-w-7xl px-3 py-3 sm:px-4 md:px-6">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-expanded={menuOpen}
+            aria-controls="site-menu"
+            aria-label={menuOpen ? t("nav.closeMenu") : t("nav.menu")}
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition ${
+              menuOpen
+                ? "border border-[var(--border-strong)] bg-[rgba(34,211,238,0.14)] text-[var(--cyan)]"
+                : "text-[var(--text)] hover:bg-[rgba(34,211,238,0.1)] hover:text-[var(--cyan)]"
+            }`}
+          >
+            <span className="sr-only">{menuOpen ? t("nav.closeMenu") : t("nav.menu")}</span>
+            {menuOpen ? (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path
+                  d="M3.5 3.5l9 9M12.5 3.5l-9 9"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+            ) : (
+              <svg width="18" height="14" viewBox="0 0 18 14" fill="none" aria-hidden="true">
+                <path
+                  d="M1 1.5h16M1 7h16M1 12.5h16"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+            )}
+          </button>
 
-        <Link href="/" className="shrink-0" onClick={() => setMenuOpen(false)}>
-          <span className="section-title text-xl tracking-[0.08em] text-[var(--cyan)] md:text-2xl">
-            AXON.MK
-          </span>
-        </Link>
+          <Link href="/" className="shrink-0" onClick={() => setMenuOpen(false)}>
+            <span className="section-title text-xl tracking-[0.08em] text-[var(--cyan)] md:text-2xl">
+              AXON.MK
+            </span>
+          </Link>
 
-        <div className="ml-auto flex shrink-0 items-center gap-3 sm:gap-4">
-          <LanguageSwitcher />
-          {user ? (
-            <button
-              onClick={logout}
-              className="btn btn-ghost !whitespace-nowrap !px-2.5 !py-2 !text-xs"
-            >
-              {t("nav.logout")}
-            </button>
-          ) : (
-            <Link
-              href="/login"
-              className="btn btn-ghost !whitespace-nowrap !px-2.5 !py-2 !text-xs"
-            >
-              {t("nav.login")}
-            </Link>
-          )}
+          <div className="ml-auto flex items-center">
+            <div className="mr-3 hidden items-center gap-1.5 md:flex">
+              <CurrencySwitcher />
+              <LanguageSwitcher />
+            </div>
+            {user ? (
+              <button
+                onClick={logout}
+                className="btn btn-ghost !whitespace-nowrap !px-3.5 !py-2 !text-xs"
+              >
+                {t("nav.logout")}
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                className="btn btn-ghost !whitespace-nowrap !px-3.5 !py-2 !text-xs"
+              >
+                {t("nav.login")}
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     </header>
@@ -135,6 +147,20 @@ export function Navbar() {
           menuOpen ? "translate-x-0" : "pointer-events-none -translate-x-full"
         }`}
       >
+        <div className="mb-4 space-y-4 border-b border-[var(--border)] pb-4 md:hidden">
+          <div>
+            <p className="mb-2 px-0.5 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+              {t("currency.label")}
+            </p>
+            <CurrencySwitcher full />
+          </div>
+          <div>
+            <p className="mb-2 px-0.5 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+              {t("lang.label")}
+            </p>
+            <LanguageSwitcher full />
+          </div>
+        </div>
         <div className="flex flex-col gap-1">
           {NAV.map((item) => {
             const active = pathname.startsWith(item.href);

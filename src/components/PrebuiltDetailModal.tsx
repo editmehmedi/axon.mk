@@ -1,10 +1,10 @@
 "use client";
 
-import { formatMkd } from "@/lib/constants";
 import { resolvePrebuiltImage } from "@/lib/partImages";
 import { getPrebuiltSpecs } from "@/lib/prebuiltSpecs";
 import { ProductImage } from "./ProductImage";
 import { useI18n } from "./LanguageProvider";
+import { useCurrency } from "./CurrencyProvider";
 import type { PrebuiltCardData } from "./PrebuiltCard";
 
 type Props = {
@@ -16,6 +16,7 @@ type Props = {
 
 export function PrebuiltDetailModal({ pc, open, onClose, onBuy }: Props) {
   const { t } = useI18n();
+  const { formatPrice } = useCurrency();
   if (!open || !pc) return null;
 
   const inStock = pc.stock > 0;
@@ -96,7 +97,7 @@ export function PrebuiltDetailModal({ pc, open, onClose, onBuy }: Props) {
 
         <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--border)] p-4 sm:p-5">
           <p className="section-title text-2xl text-[var(--cyan)]">
-            {formatMkd(pc.priceMkd)}
+            {formatPrice(pc.priceMkd)}
           </p>
           {pc.listingId ? (
             <span className="text-sm text-[var(--text-muted)]">{t("used.communityHint")}</span>

@@ -39,6 +39,7 @@ async function main() {
       passwordHash,
       role: Role.head_admin,
       isHeadAdmin: true,
+      emailVerifiedAt: new Date(),
     },
   });
 
@@ -49,6 +50,7 @@ async function main() {
       phone: "+38970222222",
       passwordHash,
       role: Role.admin,
+      emailVerifiedAt: new Date(),
     },
   });
 
@@ -59,6 +61,7 @@ async function main() {
       phone: "+38970333333",
       passwordHash,
       role: Role.user,
+      emailVerifiedAt: new Date(),
     },
   });
 

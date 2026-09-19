@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ProductImage } from "@/components/ProductImage";
 import { useI18n } from "@/components/LanguageProvider";
-import { formatMkd } from "@/lib/constants";
+import { useCurrency } from "@/components/CurrencyProvider";
 import { PART_LISTING_CATEGORIES } from "@/lib/listingCategories";
 import { proxiedExternalImage } from "@/lib/partImages";
 import type { SellListing } from "@/components/SellMarketplace";
@@ -20,6 +20,7 @@ function categoryLabel(
 
 export function UsedPartsCatalog() {
   const { t } = useI18n();
+  const { formatPrice } = useCurrency();
   const [items, setItems] = useState<SellListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState("");
@@ -114,7 +115,7 @@ export function UsedPartsCatalog() {
                     {t("sell.seller", { name: item.sellerName })}
                   </p>
                   <p className="mt-auto section-title text-xl text-[var(--cyan)]">
-                    {formatMkd(item.priceMkd)}
+                    {formatPrice(item.priceMkd)}
                   </p>
                 </div>
               </article>

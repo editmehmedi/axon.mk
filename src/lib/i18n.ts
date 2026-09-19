@@ -23,6 +23,7 @@ const en: Dict = {
   "nav.live": "Live",
   "nav.menu": "Menu",
   "nav.closeMenu": "Close menu",
+  "nav.profile": "Profile",
 
   "footer.tagline": "Custom PC assembly · Cash on Delivery · North Macedonia",
 
@@ -225,6 +226,7 @@ const en: Dict = {
   "checkout.address": "Address",
   "checkout.city": "City",
   "checkout.total": "Total",
+  "checkout.payInDen": "Cash on delivery is charged in denars: {amount}.",
   "checkout.verifyNote": "After ordering you will get a phone verification call.",
   "checkout.submit": "Confirm COD order",
   "checkout.processing": "Processing...",
@@ -277,7 +279,27 @@ const en: Dict = {
   "login.switchToRegister": "No account? Register",
   "login.switchToLogin": "Already have an account? Sign in",
   "login.requiredToBuy": "Sign in to continue your purchase.",
-  "login.error": "Error",
+  "login.error": "Something went wrong. Try again.",
+  "login.invalidCredentials": "Wrong email or password.",
+  "login.emailExists": "That email is already registered.",
+  "login.requiredForProfile": "Sign in to set up your profile.",
+  "login.verifyTitle": "Verify your email",
+  "login.verifyHint": "We sent a 6-digit code to {email}.",
+  "login.verifyCode": "Verification code",
+  "login.verifySubmit": "Verify email",
+  "login.verifyResend": "Resend code",
+  "login.verifyResent": "A new code was sent.",
+  "login.verifyWait": "Wait {seconds}s to resend.",
+  "login.codeInvalid": "That code is wrong.",
+  "login.codeExpired": "That code expired. Request a new one.",
+  "login.emailNotVerified": "Verify your email to continue.",
+  "login.resendWait": "Wait a moment before requesting another code.",
+
+  "profile.title": "Your profile",
+  "profile.desc": "Edit the name used on your orders.",
+  "profile.save": "Save",
+  "profile.saved": "Saved.",
+  "profile.nameRequired": "Enter a name (at least 2 characters).",
 
   "admin.title": "Admin Console",
   "admin.subtitle": "Inventory · Verifications · Build stages · Cargo codes",
@@ -382,6 +404,10 @@ const en: Dict = {
   "admin.filterHidden": "Hidden only",
   "admin.partShown": "Part is visible in Build PC",
   "admin.partHidden": "Part hidden from Build PC",
+  "admin.hidePcHint": "Hide from the shop (keep in inventory)",
+  "admin.showPcHint": "Show again in the shop",
+  "admin.prebuiltShown": "PC is visible in the shop",
+  "admin.prebuiltHidden": "PC hidden from the shop",
   "admin.fieldBrand": "Brand",
   "admin.fieldName": "Name",
   "admin.fieldSocket": "Socket (optional)",
@@ -403,6 +429,13 @@ const en: Dict = {
   "admin.prebuiltDeleteConfirm": "Delete “{name}”? This cannot be undone.",
   "admin.inventoryError": "Inventory update failed",
   "admin.noPartsMatch": "No parts match your search.",
+  "admin.prebuiltsHint": "Add, edit, hide, or remove ready PCs. Hidden PCs stay in inventory but do not show on Pre-Built PCs.",
+  "admin.usedHint": "Add, edit, hide, or remove used PCs. Hidden PCs stay in inventory but do not show on Used PCs.",
+  "admin.showingCount": "{count} shown",
+  "admin.searchCatalog": "Search…",
+  "admin.colCategory": "Category",
+  "admin.colPrice": "Price",
+  "admin.lowStock": "Low stock",
 
   "sell.title": "Sell your PC or parts",
   "sell.desc":
@@ -470,6 +503,7 @@ const en: Dict = {
   "admin.listingDeleteError": "Could not delete listing.",
 
   "lang.label": "Language",
+  "currency.label": "Currency",
 };
 
 const sq: Dict = {
@@ -485,6 +519,7 @@ const sq: Dict = {
   "nav.live": "Live",
   "nav.menu": "Menu",
   "nav.closeMenu": "Mbyll menunë",
+  "nav.profile": "Profili",
 
   "footer.tagline": "Montim PC custom · Pagesë në dorëzim · Maqedonia e Veriut",
 
@@ -687,6 +722,7 @@ const sq: Dict = {
   "checkout.address": "Adresa",
   "checkout.city": "Qyteti",
   "checkout.total": "Totali",
+  "checkout.payInDen": "Pagesa në dorëzim bëhet në denarë: {amount}.",
   "checkout.verifyNote": "Pas porosisë do të merrni telefonatë për verifikim.",
   "checkout.submit": "Konfirmo porosinë COD",
   "checkout.processing": "Duke u procesuar...",
@@ -739,7 +775,27 @@ const sq: Dict = {
   "login.switchToRegister": "Nuk ke llogari? Regjistrohu",
   "login.switchToLogin": "Ke llogari? Hyr",
   "login.requiredToBuy": "Hyr për të vazhduar blerjen.",
-  "login.error": "Gabim",
+  "login.error": "Ndodhi një gabim. Provo përsëri.",
+  "login.invalidCredentials": "Email ose fjalëkalim i gabuar.",
+  "login.emailExists": "Ky email tashmë ekziston.",
+  "login.requiredForProfile": "Hyr për të ngritur profilin.",
+  "login.verifyTitle": "Verifiko emailin",
+  "login.verifyHint": "Dërguam një kod 6-shifror te {email}.",
+  "login.verifyCode": "Kodi i verifikimit",
+  "login.verifySubmit": "Verifiko emailin",
+  "login.verifyResend": "Dërgo kodin sërish",
+  "login.verifyResent": "U dërgua një kod i ri.",
+  "login.verifyWait": "Prit {seconds}s për ta dërguar sërish.",
+  "login.codeInvalid": "Ky kod është i gabuar.",
+  "login.codeExpired": "Kodi skadoi. Kërko një të ri.",
+  "login.emailNotVerified": "Verifiko emailin për të vazhduar.",
+  "login.resendWait": "Prit pak para se të kërkosh kod tjetër.",
+
+  "profile.title": "Profili yt",
+  "profile.desc": "Ndrysho emrin që del te porositë.",
+  "profile.save": "Ruaj",
+  "profile.saved": "U ruajt.",
+  "profile.nameRequired": "Shkruaj një emër (të paktën 2 shkronja).",
 
   "admin.title": "Admin Console",
   "admin.subtitle": "Stoku · Verifikimet · Fazat e montimit · Kodat cargo",
@@ -844,6 +900,10 @@ const sq: Dict = {
   "admin.filterHidden": "Vetëm të fshehura",
   "admin.partShown": "Pjesa është e dukshme te Ndërto Vetë",
   "admin.partHidden": "Pjesa u fsheh nga Ndërto Vetë",
+  "admin.hidePcHint": "Fshihe nga dyqani (mbetet në stok)",
+  "admin.showPcHint": "Shfaqe përsëri te dyqani",
+  "admin.prebuiltShown": "PC është i dukshëm në dyqan",
+  "admin.prebuiltHidden": "PC u fsheh nga dyqani",
   "admin.fieldBrand": "Marka",
   "admin.fieldName": "Emri",
   "admin.fieldSocket": "Socket (opsionale)",
@@ -865,6 +925,13 @@ const sq: Dict = {
   "admin.prebuiltDeleteConfirm": "Të fshihet “{name}”? Ky veprim nuk kthehet mbrapsht.",
   "admin.inventoryError": "Përditësimi i stokut dështoi",
   "admin.noPartsMatch": "Asnjë pjesë nuk përputhet.",
+  "admin.prebuiltsHint": "Shto, ndrysho, fshih ose fshi PC të gatshme. PC-të e fshehura mbeten në stok por nuk shfaqen te PC të Gatshme.",
+  "admin.usedHint": "Shto, ndrysho, fshih ose fshi PC të përdorura. PC-të e fshehura mbeten në stok por nuk shfaqen te PC të Përdorura.",
+  "admin.showingCount": "{count} të shfaqura",
+  "admin.searchCatalog": "Kërko…",
+  "admin.colCategory": "Kategoria",
+  "admin.colPrice": "Çmimi",
+  "admin.lowStock": "Stok i ulët",
 
   "sell.title": "Shit PC ose pjesë",
   "sell.desc":
@@ -932,6 +999,7 @@ const sq: Dict = {
   "admin.listingDeleteError": "Listimi nuk u fshi.",
 
   "lang.label": "Gjuha",
+  "currency.label": "Valuta",
 };
 
 const mk: Dict = {
@@ -947,6 +1015,7 @@ const mk: Dict = {
   "nav.live": "Live",
   "nav.menu": "Мени",
   "nav.closeMenu": "Затвори мени",
+  "nav.profile": "Профил",
 
   "footer.tagline": "Custom PC assembly · Cash on Delivery · Северна Македонија",
 
@@ -1149,6 +1218,7 @@ const mk: Dict = {
   "checkout.address": "Адреса",
   "checkout.city": "Град",
   "checkout.total": "Вкупно",
+  "checkout.payInDen": "Плаќањето при достава е во денари: {amount}.",
   "checkout.verifyNote": "По нарачката ќе добиете телефонски повик за верификација.",
   "checkout.submit": "Потврди COD нарачка",
   "checkout.processing": "Се процесира...",
@@ -1201,7 +1271,27 @@ const mk: Dict = {
   "login.switchToRegister": "Немаш профил? Регистрација",
   "login.switchToLogin": "Веќе имаш профил? Најава",
   "login.requiredToBuy": "Најави се за да ја продолжиш купувањето.",
-  "login.error": "Грешка",
+  "login.error": "Настана грешка. Обиди се повторно.",
+  "login.invalidCredentials": "Погрешна е-пошта или лозинка.",
+  "login.emailExists": "Оваа е-пошта веќе постои.",
+  "login.requiredForProfile": "Најави се за да го поставиш профилот.",
+  "login.verifyTitle": "Потврди ја е-поштата",
+  "login.verifyHint": "Испративме 6-цифрен код на {email}.",
+  "login.verifyCode": "Код за верификација",
+  "login.verifySubmit": "Потврди е-пошта",
+  "login.verifyResend": "Испрати код повторно",
+  "login.verifyResent": "Испратен е нов код.",
+  "login.verifyWait": "Почекај {seconds}с за повторно испраќање.",
+  "login.codeInvalid": "Кодот е погрешен.",
+  "login.codeExpired": "Кодот истече. Побарај нов.",
+  "login.emailNotVerified": "Потврди ја е-поштата за да продолжиш.",
+  "login.resendWait": "Почекај малку пред да побараш нов код.",
+
+  "profile.title": "Твој профил",
+  "profile.desc": "Смени го името што се користи на нарачките.",
+  "profile.save": "Зачувај",
+  "profile.saved": "Зачувано.",
+  "profile.nameRequired": "Внеси име (најмалку 2 знаци).",
 
   "admin.title": "Admin Console",
   "admin.subtitle": "Inventory · Verifications · Build stages · Cargo codes",
@@ -1306,6 +1396,10 @@ const mk: Dict = {
   "admin.filterHidden": "Само скриени",
   "admin.partShown": "Делот е видлив во Склопи Сам",
   "admin.partHidden": "Делот е скриен од Склопи Сам",
+  "admin.hidePcHint": "Сокриј од продавницата (останува во залиха)",
+  "admin.showPcHint": "Повторно прикажи во продавницата",
+  "admin.prebuiltShown": "PC е видлив во продавницата",
+  "admin.prebuiltHidden": "PC е скриен од продавницата",
   "admin.fieldBrand": "Бренд",
   "admin.fieldName": "Име",
   "admin.fieldSocket": "Socket (опционално)",
@@ -1327,6 +1421,13 @@ const mk: Dict = {
   "admin.prebuiltDeleteConfirm": "Да се избрише „{name}“? Ова не може да се врати.",
   "admin.inventoryError": "Ажурирањето на залихата не успеа",
   "admin.noPartsMatch": "Нема делови според пребарувањето.",
+  "admin.prebuiltsHint": "Додај, измени, сокриј или отстрани готови PC. Скриените остануваат во залиха, но не се гледаат на Pre-Built PCs.",
+  "admin.usedHint": "Додај, измени, сокриј или отстрани користени PC. Скриените остануваат во залиха, но не се гледаат на Used PCs.",
+  "admin.showingCount": "{count} прикажани",
+  "admin.searchCatalog": "Пребарај…",
+  "admin.colCategory": "Категорија",
+  "admin.colPrice": "Цена",
+  "admin.lowStock": "Мала залиха",
 
   "sell.title": "Продај PC или делови",
   "sell.desc":
@@ -1394,6 +1495,7 @@ const mk: Dict = {
   "admin.listingDeleteError": "Објавата не може да се избрише.",
 
   "lang.label": "Јазик",
+  "currency.label": "Валута",
 };
 
 export const dictionaries: Record<Locale, Dict> = { en, sq, mk };

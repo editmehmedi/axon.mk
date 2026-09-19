@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { formatMkd, formatDateTime, type OrderStatusCode } from "@/lib/constants";
+import { formatDateTime, type OrderStatusCode } from "@/lib/constants";
 import { LiveBuildPipeline } from "@/components/LiveBuildPipeline";
 import { localizeOrderNote } from "@/lib/orderNotes";
 import { useI18n } from "@/components/LanguageProvider";
+import { useCurrency } from "@/components/CurrencyProvider";
 
 type OrderDetail = {
   trackingCode: string;
@@ -33,6 +34,7 @@ function fingerprint(o: OrderDetail | null): string {
 
 export default function OrderDetailPage() {
   const { t } = useI18n();
+  const { formatPrice } = useCurrency();
   const params = useParams<{ code: string }>();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [error, setError] = useState("");
@@ -72,7 +74,7 @@ export default function OrderDetailPage() {
         <>
           <p className="mt-2 text-[var(--text-muted)]">
             {order.type === "PREBUILT" ? order.prebuilt?.name : t("orders.customBuild")} ·{" "}
-            {formatMkd(order.totalMkd)} · COD
+            {formatPrice(order.totalMkd)} · COD
           </p>
           {order.cargoCode && (
             <p className="mt-1 text-sm text-[var(--mint)]">Cargo: {order.cargoCode}</p>
@@ -125,7 +127,7 @@ export default function OrderDetailPage() {
                   {item.category}: {item.label}
                   {qty > 1 ? ` ×${qty}` : ""}
                 </span>
-                <span>{item.priceMkd != null ? formatMkd(lineTotal) : ""}</span>
+                <span>{item.priceMkd != null ? formatPrice(lineTotal) : ""}</span>
               </li>
               );
             })}

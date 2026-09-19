@@ -40,18 +40,21 @@ enum OrderStatus {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  name         String
-  phone        String?
-  role         Role     @default(user)
+  id                   String    @id @default(cuid())
+  email                String    @unique
+  passwordHash         String
+  name                 String
+  phone                String?
+  role                 Role      @default(user)
   /// Enforces single head_admin via partial unique semantics (only true for one row)
-  isHeadAdmin  Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  orders       Order[]
-  listings     UserListing[]
+  isHeadAdmin          Boolean   @default(false)
+  emailVerifiedAt      DateTime?
+  emailVerifyCode      String?
+  emailVerifyExpiresAt DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  orders               Order[]
+  listings             UserListing[]
 }
 
 /// Community marketplace listing — users sell PCs or components

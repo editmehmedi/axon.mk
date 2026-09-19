@@ -65,9 +65,10 @@ export async function getSession(): Promise<SessionUser | null> {
     // JWT can outlive a db reset/seed — never trust id/role from the cookie alone.
     const user = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, email: true, name: true, role: true },
+      select: { id: true, email: true, name: true, role: true, emailVerifiedAt: true },
     });
-    return user;
+    if (!user?.emailVerifiedAt) return null;
+    return { id: user.id, email: user.email, name: user.name, role: user.role };
   } catch {
     return null;
   }
