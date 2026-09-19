@@ -9,8 +9,6 @@ export default async function HomePage() {
     orderBy: { priceMkd: "asc" },
     take: 3,
   });
-  const settings = await prisma.siteSettings.findUnique({ where: { id: 1 } });
-  const fee = settings?.assemblyFeeMkd ?? 2999;
 
-  return <HomeView prebuilts={prebuilts} fee={fee} />;
+  return <HomeView prebuilts={prebuilts} />;
 }

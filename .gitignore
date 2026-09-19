@@ -56,3 +56,6 @@ _gjirafa_ram_stock.html
 /public/uploads/*
 !/public/uploads/.gitkeep
 /public/parts/c__Users_*
+
+.vercel
+.env*

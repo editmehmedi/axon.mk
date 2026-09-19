@@ -213,3 +213,52 @@ a {
     linear-gradient(90deg, rgba(34, 211, 238, 0.04) 1px, transparent 1px);
   background-size: 48px 48px;
 }
+
+@keyframes throw-to-cart {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  48% {
+    transform: translate3d(
+        calc(var(--throw-dx) * 0.5),
+        calc(var(--throw-dy) * 0.3 - 80px),
+        0
+      )
+      scale(0.64) rotate(14deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--throw-dx), var(--throw-dy), 0) scale(0.1) rotate(40deg);
+    opacity: 0;
+  }
+}
+
+.throw-to-cart {
+  animation: throw-to-cart 0.72s cubic-bezier(0.22, 0.82, 0.28, 1) forwards;
+  transform-origin: center center;
+  will-change: transform, opacity;
+}
+
+@keyframes cart-catch {
+  0% {
+    transform: scale(1);
+  }
+  38% {
+    transform: scale(1.22);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.cart-catch {
+  animation: cart-catch 0.4s cubic-bezier(0.2, 1.35, 0.32, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .throw-to-cart,
+  .cart-catch {
+    animation: none;
+  }
+}

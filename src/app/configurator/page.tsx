@@ -187,13 +187,25 @@ export default function ConfiguratorPage() {
   const [usedPartsReady, setUsedPartsReady] = useState(false);
   const [draftReady, setDraftReady] = useState(false);
   const [resumeCheckout, setResumeCheckout] = useState(false);
+  const [pricingOpen, setPricingOpen] = useState(false);
+  const [cartBump, setCartBump] = useState(false);
+  const [throwClones, setThrowClones] = useState<
+    { id: number; src: string; x: number; y: number; w: number; h: number; dx: number; dy: number }[]
+  >([]);
   const draftHydrated = useRef(false);
+  const cartBtnRef = useRef<HTMLButtonElement>(null);
+  const throwIdRef = useRef(0);
+  const cartBumpTimer = useRef<number>(0);
 
   useEffect(() => {
     let cancelled = false;
     setPartsLoading(true);
     fetch("/api/parts")
-      .then((r) => r.json())
+      .then(async (r) => {
+        const text = await r.text();
+        if (!text) throw new Error("Empty response");
+        return JSON.parse(text) as { items?: Part[]; assemblyFeeMkd?: number };
+      })
       .then((d) => {
         if (cancelled) return;
         setNewParts(
@@ -203,6 +215,9 @@ export default function ConfiguratorPage() {
           })),
         );
         setFee(d.assemblyFeeMkd ?? ASSEMBLY_FEE_DEFAULT);
+      })
+      .catch(() => {
+        if (!cancelled) setNewParts([]);
       })
       .finally(() => {
         if (!cancelled) setPartsLoading(false);
@@ -507,6 +522,24 @@ export default function ConfiguratorPage() {
     };
   }, [draftReady, resumeCheckout, requiredReady, blocked]);
 
+  useEffect(() => {
+    if (!pricingOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setPricingOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [pricingOpen]);
+
+  useEffect(() => {
+    return () => window.clearTimeout(cartBumpTimer.current);
+  }, []);
+
   function persistDraftNow(sel: CompatSelection = selection) {
     saveBuilderDraft({
       condition,
@@ -547,6 +580,7 @@ export default function ConfiguratorPage() {
   async function beginBuy(sel: CompatSelection = selection) {
     if (!canBuySelection(sel)) return;
     if (!(await requireLoginForBuy(sel))) return;
+    setPricingOpen(false);
     setCheckoutOpen(true);
   }
 
@@ -590,10 +624,52 @@ export default function ConfiguratorPage() {
     void beginBuy(nextSel);
   }
 
-  function pick(part: Part) {
+  function throwToCart(sourceEl: HTMLElement, src: string) {
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setCartBump(true);
+      window.clearTimeout(cartBumpTimer.current);
+      cartBumpTimer.current = window.setTimeout(() => setCartBump(false), 400);
+      return;
+    }
+    const cart = cartBtnRef.current;
+    if (!cart) return;
+    const cartRect = cart.getBoundingClientRect();
+    if (cartRect.width < 8) return;
+    const from = sourceEl.getBoundingClientRect();
+    const id = ++throwIdRef.current;
+    setThrowClones((list) => [
+      ...list,
+      {
+        id,
+        src,
+        x: from.left,
+        y: from.top,
+        w: from.width,
+        h: from.height,
+        dx: cartRect.left + cartRect.width / 2 - (from.left + from.width / 2),
+        dy: cartRect.top + cartRect.height / 2 - (from.top + from.height / 2),
+      },
+    ]);
+  }
+
+  function finishThrow(id: number) {
+    setThrowClones((list) => list.filter((item) => item.id !== id));
+    setCartBump(true);
+    window.clearTimeout(cartBumpTimer.current);
+    cartBumpTimer.current = window.setTimeout(() => setCartBump(false), 400);
+  }
+
+  function pick(part: Part, sourceEl?: HTMLElement) {
     const outOfStock = !partHasStock(part);
     const alreadyOn = isPartActive(part);
     if (outOfStock && !alreadyOn) return;
+
+    const adding = !alreadyOn;
+
+    if (adding && sourceEl) {
+      const img = sourceEl.querySelector("img");
+      throwToCart(img ?? sourceEl, resolvePartImage(part));
+    }
 
     // Toggle deselect when clicking the same part again
     if (currentCat === "SSD") {
@@ -708,7 +784,7 @@ export default function ConfiguratorPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1600px] px-4 py-10 md:px-6">
+    <div className="mx-auto max-w-[1600px] px-4 py-10 pb-28 md:px-6 lg:pb-10">
       <div className="mb-8">
         <h1 className="section-title text-3xl md:text-4xl">{t("builder.title")}</h1>
         <p className="mt-2 text-[var(--text-muted)]">{t("builder.desc")}</p>
@@ -767,8 +843,26 @@ export default function ConfiguratorPage() {
 
       <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)_190px]">
         <aside className="order-3 space-y-4 lg:order-1 lg:sticky lg:top-20 lg:self-start">
+          <div
+            id="builder-pricing"
+            className={
+              pricingOpen
+                ? "fixed inset-x-0 bottom-0 z-[90] max-h-[85vh] overflow-y-auto p-4 lg:static lg:z-auto lg:max-h-none lg:overflow-visible lg:p-0"
+                : "hidden lg:block"
+            }
+          >
           <div className="glass-strong rounded-2xl p-5">
-            <h3 className="section-title text-xl">{t("builder.pricing")}</h3>
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="section-title text-xl">{t("builder.pricing")}</h3>
+              <button
+                type="button"
+                onClick={() => setPricingOpen(false)}
+                className="btn btn-ghost !px-3 !py-1.5 !text-sm lg:hidden"
+                aria-label={t("prebuilts.close")}
+              >
+                ✕
+              </button>
+            </div>
             <div className="mt-3 space-y-2 text-sm">
               {BUILDER_STEPS.map((cat) => {
                 const key = cat as keyof CompatSelection;
@@ -904,6 +998,7 @@ export default function ConfiguratorPage() {
               {t("builder.order")}
             </button>
           </div>
+          </div>
 
           <div className="glass rounded-2xl p-5">
             <h3 className="section-title text-lg">{t("builder.compatibility")}</h3>
@@ -1034,12 +1129,12 @@ export default function ConfiguratorPage() {
                   tabIndex={outOfStock && !active ? -1 : 0}
                   aria-disabled={outOfStock && !active}
                   aria-pressed={active}
-                  onClick={() => pick(part)}
+                  onClick={(e) => pick(part, e.currentTarget)}
                   onKeyDown={(e) => {
                     if (outOfStock && !active) return;
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      pick(part);
+                      pick(part, e.currentTarget);
                     }
                   }}
                   className={`group overflow-hidden rounded-lg border p-2 text-left transition ${
@@ -1185,6 +1280,74 @@ export default function ConfiguratorPage() {
           />
         </div>
       </div>
+
+      {pricingOpen && (
+        <button
+          type="button"
+          aria-label={t("prebuilts.close")}
+          className="fixed inset-0 z-[85] bg-black/60 lg:hidden"
+          onClick={() => setPricingOpen(false)}
+        />
+      )}
+
+      {!pricingOpen && !checkoutOpen && (
+        <button
+          ref={cartBtnRef}
+          type="button"
+          onClick={() => setPricingOpen(true)}
+          aria-expanded={pricingOpen}
+          aria-controls="builder-pricing"
+          aria-label={t("builder.pricing")}
+          className={`fixed z-50 flex h-12 w-12 items-center justify-center rounded-full border border-[var(--border-strong)] bg-[rgba(12,20,34,0.95)] text-[var(--cyan)] shadow-[var(--glow)] backdrop-blur-xl lg:hidden ${
+            cartBump ? "cart-catch" : ""
+          }`}
+          style={{
+            bottom: "max(1rem, env(safe-area-inset-bottom))",
+            right: "max(1rem, env(safe-area-inset-right))",
+          }}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="h-6 w-6"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="9" cy="20" r="1.4" fill="currentColor" stroke="none" />
+            <circle cx="18" cy="20" r="1.4" fill="currentColor" stroke="none" />
+            <path d="M3 4h2l2.2 11.2a1.5 1.5 0 0 0 1.5 1.2h9.2a1.5 1.5 0 0 0 1.5-1.2L21 8H7" />
+          </svg>
+        </button>
+      )}
+
+      {throwClones.map((item) => (
+        <span
+          key={item.id}
+          aria-hidden
+          className="throw-to-cart pointer-events-none fixed z-[60] overflow-hidden rounded-lg bg-white shadow-[0_10px_28px_rgba(34,211,238,0.35)]"
+          style={
+            {
+              left: item.x,
+              top: item.y,
+              width: item.w,
+              height: item.h,
+              "--throw-dx": `${item.dx}px`,
+              "--throw-dy": `${item.dy}px`,
+            } as React.CSSProperties
+          }
+          onAnimationEnd={() => finishThrow(item.id)}
+        >
+          {item.src ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={item.src} alt="" className="h-full w-full object-contain p-1" />
+          ) : (
+            <span className="block h-full w-full bg-[rgba(34,211,238,0.25)]" />
+          )}
+        </span>
+      ))}
 
       <CheckoutModal
         open={checkoutOpen}
