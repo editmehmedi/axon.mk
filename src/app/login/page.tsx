@@ -109,9 +109,6 @@ function LoginInner() {
           {mode === "login" ? t("login.switchToRegister") : t("login.switchToLogin")}
         </button>
 
-        <div className="mt-6 rounded-lg bg-[rgba(7,11,18,0.5)] p-3 text-xs text-[var(--text-muted)]">
-          {t("login.demo")} <span className="text-[var(--text)]">axon1234</span>
-        </div>
         <Link href="/" className="mt-4 inline-block text-xs text-[var(--text-muted)]">
           {t("login.back")}
         </Link>

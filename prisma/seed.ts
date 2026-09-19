@@ -1,4 +1,5 @@
 import path from "path";
+import crypto from "crypto";
 import { PrismaClient, Role, OrderStatus } from "../src/generated/prisma";
 import bcrypt from "bcryptjs";
 import { exactPartImagePath } from "../src/lib/exactParts";
@@ -27,7 +28,8 @@ async function main() {
     },
   });
 
-  const passwordHash = await bcrypt.hash("axon1234", 10);
+  const seedPassword = process.env.SEED_PASSWORD || crypto.randomBytes(12).toString("base64url");
+  const passwordHash = await bcrypt.hash(seedPassword, 10);
 
   await prisma.user.create({
     data: {
@@ -552,7 +554,9 @@ async function main() {
   console.log("Seed complete. Parts:", parts.length, byCat);
   console.log("Prebuilts:", prebuilts.length, "Used:", usedPcs.length);
   console.log("Demo order:", demoOrder.trackingCode);
-  console.log("Logins: owner@axon.mk / admin@axon.mk / user@axon.mk — password: axon1234");
+  console.log(
+    `Seed logins: owner@axon.mk / admin@axon.mk / user@axon.mk — password: ${seedPassword}`,
+  );
 }
 
 main()

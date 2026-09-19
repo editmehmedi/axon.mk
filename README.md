@@ -76,12 +76,8 @@ npx prisma db seed
 
 Do **not** run seed on every deploy — it wipes orders and users.
 
-## Demo accounts
+## Seed accounts
 
-| Email | Password | Role |
-|-------|----------|------|
-| owner@axon.mk | axon1234 | head_admin |
-| admin@axon.mk | axon1234 | admin |
-| user@axon.mk | axon1234 | user |
+`npx prisma db seed` creates `owner@axon.mk` (head admin), `admin@axon.mk`, and `user@axon.mk`. Set `SEED_PASSWORD` before seeding; if it is missing, the seed generates one and prints it. Do not use seed passwords on the live shop.
 
 Demo tracking code: `AXN-DEMO01`
