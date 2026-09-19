@@ -26,7 +26,7 @@ const en: Dict = {
 
   "home.eyebrow": "North Macedonia",
   "home.hero":
-    "Ready gaming systems and an interactive PC builder with real compatibility checks and 24h COD delivery.",
+    "Ready gaming systems and an interactive PC builder with real compatibility checks.",
   "home.ctaPrebuilts": "Pre-Built PCs",
   "home.ctaUsed": "Buy Used PC",
   "home.ctaUsedParts": "Buy Used Parts",
@@ -40,7 +40,7 @@ const en: Dict = {
     "Step-by-step selection: CPU, GPU, Motherboard, RAM, PSU, Case — with automatic socket and wattage checks.",
   "home.compatSocket": "CPU ↔ Motherboard socket verification",
   "home.compatPsu": "PSU wattage validation",
-  "home.compatFee": "Assembly & Testing fee: +{fee} (can be turned off)",
+  "home.compatFee": "Assembly & Testing fee: +{fee}",
   "home.compatCod": "Cash on Delivery — pay when you receive it",
   "home.openConfigurator": "Open Configurator",
   "home.pricingTitle": "Pricing breakdown",
@@ -479,7 +479,7 @@ const sq: Dict = {
 
   "home.eyebrow": "Maqedonia e Veriut",
   "home.hero":
-    "Sisteme gaming të gatshme dhe builder interaktiv PC me kontroll kompatibiliteti dhe dorëzim COD 24 orë.",
+    "Sisteme gaming të gatshme dhe builder interaktiv PC me kontroll kompatibiliteti.",
   "home.ctaPrebuilts": "PC të Gatshme",
   "home.ctaUsed": "Bli PC të Përdorur",
   "home.ctaUsedParts": "Bli Pjesë të Përdorura",
@@ -493,7 +493,7 @@ const sq: Dict = {
     "Zgjedhje hap pas hapi: CPU, GPU, Motherboard, RAM, PSU, Case — me kontrolle automatike socket dhe wattage.",
   "home.compatSocket": "Verifikim socket CPU ↔ Motherboard",
   "home.compatPsu": "Validim wattage i PSU",
-  "home.compatFee": "Tarifa e montimit & testimit: +{fee} (mund të fiket)",
+  "home.compatFee": "Tarifa e montimit & testimit: +{fee}",
   "home.compatCod": "Pagesë në dorëzim — Cash on Delivery",
   "home.openConfigurator": "Hap Configurator",
   "home.pricingTitle": "Ndarja e çmimit",
@@ -932,7 +932,7 @@ const mk: Dict = {
 
   "home.eyebrow": "Северна Македонија",
   "home.hero":
-    "Готови gaming системи и интерактивен PC builder со реална компатибилност и COD испорака за 24ч.",
+    "Готови gaming системи и интерактивен PC builder со реална компатибилност.",
   "home.ctaPrebuilts": "Готови Конфигурации",
   "home.ctaUsed": "Купи половен PC",
   "home.ctaUsedParts": "Купи половни делови",
@@ -946,7 +946,7 @@ const mk: Dict = {
     "Чекор-по-чекор избор: CPU, GPU, Motherboard, RAM, PSU, Case — со автоматски socket и wattage проверки.",
   "home.compatSocket": "CPU ↔ Motherboard socket verification",
   "home.compatPsu": "PSU wattage validation",
-  "home.compatFee": "Assembly & Testing fee: +{fee} (може да се исклучи)",
+  "home.compatFee": "Assembly & Testing fee: +{fee}",
   "home.compatCod": "Cash on Delivery — Плаќање при преземање",
   "home.openConfigurator": "Отвори Configurator",
   "home.pricingTitle": "Ценовник",
