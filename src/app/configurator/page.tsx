@@ -119,7 +119,20 @@ const DEFAULT_FILTERS: PartFilterState = {
   priceMax: 0,
 };
 
-const PAGE_SIZE = 9;
+const PAGE_SIZE = 6;
+const PAGE_BUTTONS = 6;
+
+function visiblePageNumbers(current: number, total: number, max = PAGE_BUTTONS): number[] {
+  if (total <= max) return Array.from({ length: total }, (_, i) => i + 1);
+  const half = Math.floor(max / 2);
+  let start = Math.max(1, current - half);
+  let end = start + max - 1;
+  if (end > total) {
+    end = total;
+    start = Math.max(1, end - max + 1);
+  }
+  return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+}
 
 function QuantityStepper({
   label,
@@ -176,9 +189,35 @@ function QuantityStepper({
   );
 }
 
+function RemoveItemButton({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className="-mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--text-muted)] transition hover:bg-[rgba(251,113,133,0.15)] hover:text-[var(--danger)]"
+    >
+      <span aria-hidden>✕</span>
+    </button>
+  );
+}
+
 function stepHasSelection(sel: CompatSelection, cat: keyof CompatSelection): boolean {
   if (cat === "SSD") return getSsds(sel).length > 0;
   return Boolean(sel[cat]);
+}
+
+function selectionHasChoice(sel: CompatSelection): boolean {
+  return BUILDER_STEPS.some((cat) => {
+    if (cat === "SSD") return Boolean(sel.SSD?.length);
+    return Boolean(sel[cat]);
+  });
 }
 
 export default function ConfiguratorPage() {
@@ -208,6 +247,8 @@ export default function ConfiguratorPage() {
   >([]);
   const draftHydrated = useRef(false);
   const cartBtnRef = useRef<HTMLButtonElement>(null);
+  const stepPanelRef = useRef<HTMLDivElement>(null);
+  const skipStepScroll = useRef(true);
   const throwIdRef = useRef(0);
   const cartBumpTimer = useRef<number>(0);
   const autoNextTimer = useRef<number>(0);
@@ -558,6 +599,24 @@ export default function ConfiguratorPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!draftReady) return;
+    if (skipStepScroll.current) {
+      skipStepScroll.current = false;
+      return;
+    }
+    const id = window.requestAnimationFrame(() => {
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const el = stepPanelRef.current;
+      if (el) {
+        el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+      } else {
+        window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+      }
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [step, draftReady]);
+
   function persistDraftNow(sel: CompatSelection = selection) {
     saveBuilderDraft({
       condition,
@@ -623,6 +682,30 @@ export default function ConfiguratorPage() {
       { ...sel, [currentCat]: none } as CompatSelection,
       currentCat,
     );
+  }
+
+  function removeCategory(cat: keyof CompatSelection) {
+    window.clearTimeout(autoNextTimer.current);
+    setSlotWarning(null);
+    setSelection((s) => {
+      const next: CompatSelection =
+        cat === "SSD" ? { ...s, SSD: null } : { ...s, [cat]: null };
+      let pruned = pruneIncompatibleSelection(next, cat);
+      if (cat === "CPU" && pruned.COOLER && isStockCoolerPart(pruned.COOLER)) {
+        pruned = { ...pruned, COOLER: null };
+      }
+      return pruned;
+    });
+  }
+
+  function clearAll() {
+    window.clearTimeout(autoNextTimer.current);
+    setSelection({});
+    setRamQtyById({});
+    setSsdQtyById({});
+    setSlotWarning(null);
+    setStep(0);
+    clearBuilderDraft();
   }
 
   function goPrev() {
@@ -769,6 +852,7 @@ export default function ConfiguratorPage() {
     selection.CPU && !isNonePart(selection.CPU) ? (selection.CPU as Part) : null;
   const isFirstStep = step <= 0;
   const isLastStep = step >= BUILDER_STEPS.length - 1;
+  const canClear = selectionHasChoice(selection);
 
   async function submitOrder(data: {
     customerName: string;
@@ -820,7 +904,7 @@ export default function ConfiguratorPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1600px] px-4 py-10 pb-44 md:px-6 lg:pb-10">
+    <div className="mx-auto max-w-[1600px] px-4 py-10 pb-52 md:px-6 lg:pb-10">
       <div className="mb-8">
         <h1 className="section-title text-3xl md:text-4xl">{t("builder.title")}</h1>
         <p className="mt-2 text-[var(--text-muted)]">{t("builder.desc")}</p>
@@ -891,34 +975,54 @@ export default function ConfiguratorPage() {
           <div className="glass-strong rounded-2xl p-5">
             <div className="flex items-start justify-between gap-3">
               <h3 className="section-title text-xl">{t("builder.pricing")}</h3>
-              <button
-                type="button"
-                onClick={() => setPricingOpen(false)}
-                className="btn btn-ghost !px-3 !py-1.5 !text-sm lg:hidden"
-                aria-label={t("prebuilts.close")}
-              >
-                ✕
-              </button>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  disabled={!canClear}
+                  className="rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs font-semibold text-[var(--danger)] transition enabled:hover:border-[var(--danger)] enabled:hover:bg-[rgba(251,113,133,0.1)] disabled:cursor-not-allowed disabled:opacity-35"
+                >
+                  {t("builder.clearAll")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPricingOpen(false)}
+                  className="btn btn-ghost !px-3 !py-1.5 !text-sm lg:hidden"
+                  aria-label={t("prebuilts.close")}
+                >
+                  ✕
+                </button>
+              </div>
             </div>
             <div className="mt-3 space-y-2 text-sm">
               {BUILDER_STEPS.map((cat) => {
                 const key = cat as keyof CompatSelection;
+                const removeLabel = t("builder.removeItem", { part: t(STEP_KEYS[cat]) });
                 if (key === "SSD") {
                   if (ssdIsNone(selection) || !selectedSsd) {
+                    const canRemove = ssdIsNone(selection);
                     return (
-                      <div key={cat} className="flex justify-between gap-2">
+                      <div key={cat} className="flex items-center justify-between gap-2">
                         <span className="text-[var(--text-muted)]">
                           {t(STEP_KEYS[cat])}
                           <span className="text-[var(--text)]"> · {t("builder.none")}</span>
                         </span>
-                        <span className="shrink-0 tabular-nums">{formatPrice(0)}</span>
+                        <span className="flex shrink-0 items-center gap-0.5">
+                          <span className="tabular-nums">{formatPrice(0)}</span>
+                          {canRemove ? (
+                            <RemoveItemButton
+                              label={removeLabel}
+                              onClick={() => removeCategory("SSD")}
+                            />
+                          ) : null}
+                        </span>
                       </div>
                     );
                   }
                   const ssd = selectedSsd;
                   const ssdQty = ssdQtyFor(ssd);
                   return (
-                    <div key={cat} className="flex justify-between gap-2">
+                    <div key={cat} className="flex items-center justify-between gap-2">
                       <span className="min-w-0 truncate text-[var(--text-muted)]">
                         {t(STEP_KEYS[cat])}
                         {ssdQty > 1 ? ` ×${ssdQty}` : ""}
@@ -927,8 +1031,14 @@ export default function ConfiguratorPage() {
                           · {partLabel(ssd, t("builder.usedBadge"))}
                         </span>
                       </span>
-                      <span className="shrink-0 tabular-nums">
-                        {formatPrice((ssd.priceMkd ?? 0) * ssdQty)}
+                      <span className="flex shrink-0 items-center gap-0.5">
+                        <span className="tabular-nums">
+                          {formatPrice((ssd.priceMkd ?? 0) * ssdQty)}
+                        </span>
+                        <RemoveItemButton
+                          label={removeLabel}
+                          onClick={() => removeCategory("SSD")}
+                        />
                       </span>
                     </div>
                   );
@@ -936,7 +1046,7 @@ export default function ConfiguratorPage() {
                 const p = selection[key] as Part | null | undefined;
                 const ramQty = key === "RAM" && p && !isNonePart(p) ? ramQtyFor(p) : 1;
                 return (
-                  <div key={cat} className="flex justify-between gap-2">
+                  <div key={cat} className="flex items-center justify-between gap-2">
                     <span className="min-w-0 truncate text-[var(--text-muted)]">
                       {t(STEP_KEYS[cat])}
                       {ramQty > 1 ? ` ×${ramQty}` : ""}
@@ -950,12 +1060,20 @@ export default function ConfiguratorPage() {
                         </span>
                       ) : null}
                     </span>
-                    <span className="shrink-0 tabular-nums">
-                      {p
-                        ? isNonePart(p)
-                          ? formatPrice(0)
-                          : formatPrice((p.priceMkd ?? 0) * ramQty)
-                        : "—"}
+                    <span className="flex shrink-0 items-center gap-0.5">
+                      <span className="tabular-nums">
+                        {p
+                          ? isNonePart(p)
+                            ? formatPrice(0)
+                            : formatPrice((p.priceMkd ?? 0) * ramQty)
+                          : "—"}
+                      </span>
+                      {p ? (
+                        <RemoveItemButton
+                          label={removeLabel}
+                          onClick={() => removeCategory(key)}
+                        />
+                      ) : null}
                     </span>
                   </div>
                 );
@@ -1065,7 +1183,7 @@ export default function ConfiguratorPage() {
           />
         </aside>
 
-        <div className="order-2 glass rounded-2xl p-4 lg:order-2">
+        <div ref={stepPanelRef} className="order-2 scroll-mt-20 glass rounded-2xl p-4 lg:order-2">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               <h2 className="section-title text-xl">
@@ -1080,6 +1198,14 @@ export default function ConfiguratorPage() {
               </p>
             </div>
             <div className="hidden shrink-0 items-center gap-2 lg:flex">
+              <button
+                type="button"
+                onClick={clearAll}
+                disabled={!canClear}
+                className="rounded-lg border border-[var(--border)] px-3.5 py-2 text-sm font-medium text-[var(--danger)] transition enabled:hover:border-[var(--danger)] enabled:hover:bg-[rgba(251,113,133,0.1)] disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                {t("builder.clearAll")}
+              </button>
               <button
                 type="button"
                 onClick={goPrev}
@@ -1288,21 +1414,21 @@ export default function ConfiguratorPage() {
           </div>
 
           {options.length > PAGE_SIZE && (
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+            <div className="mt-5 flex flex-nowrap items-center justify-center gap-1">
               <button
                 type="button"
                 disabled={safePage <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="rounded-lg px-2.5 py-1.5 text-xs text-[var(--text-muted)] disabled:opacity-30 hover:text-[var(--text)]"
+                className="shrink-0 rounded-lg px-2 py-1.5 text-xs text-[var(--text-muted)] disabled:opacity-30 hover:text-[var(--text)]"
               >
                 ‹
               </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+              {visiblePageNumbers(safePage, totalPages).map((n) => (
                 <button
                   key={n}
                   type="button"
                   onClick={() => setPage(n)}
-                  className={`min-w-8 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+                  className={`min-w-7 shrink-0 rounded-lg px-2 py-1.5 text-xs font-medium transition ${
                     n === safePage
                       ? "bg-[var(--cyan)] text-[#041018]"
                       : "bg-[rgba(34,211,238,0.08)] text-[var(--text-muted)] hover:text-[var(--text)]"
@@ -1315,13 +1441,10 @@ export default function ConfiguratorPage() {
                 type="button"
                 disabled={safePage >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="rounded-lg px-2.5 py-1.5 text-xs text-[var(--text-muted)] disabled:opacity-30 hover:text-[var(--text)]"
+                className="shrink-0 rounded-lg px-2 py-1.5 text-xs text-[var(--text-muted)] disabled:opacity-30 hover:text-[var(--text)]"
               >
                 ›
               </button>
-              <span className="ml-2 text-[11px] text-[var(--text-muted)]">
-                {t("builder.pageOf", { page: safePage, pages: totalPages })}
-              </span>
             </div>
           )}
         </div>
@@ -1380,58 +1503,65 @@ export default function ConfiguratorPage() {
               );
             })}
           </div>
-          <div className="mx-auto mt-1.5 flex max-w-[1600px] items-center gap-2">
+          <div className="mx-auto mt-1.5 flex max-w-[1600px] flex-col gap-1.5">
             <button
               type="button"
-              onClick={goPrev}
-              disabled={isFirstStep}
-              className="min-h-11 flex-1 rounded-xl border border-[var(--border)] px-3 text-sm font-semibold text-[var(--text)] transition enabled:active:scale-[0.98] enabled:hover:border-[var(--cyan)] enabled:hover:text-[var(--cyan)] disabled:cursor-not-allowed disabled:opacity-35"
+              onClick={clearAll}
+              disabled={!canClear}
+              className="min-h-8 rounded-lg text-xs font-semibold text-[var(--danger)] transition enabled:active:scale-[0.98] enabled:hover:bg-[rgba(251,113,133,0.1)] disabled:cursor-not-allowed disabled:opacity-35"
             >
-              {t("builder.prev")}
+              {t("builder.clearAll")}
             </button>
-            <button
-              type="button"
-              onClick={goNextOrBuy}
-              disabled={isLastStep && !canBuySelection(ensureStepChoice(selection))}
-              className="min-h-11 flex-1 rounded-xl bg-[var(--cyan)] px-3 text-sm font-semibold text-[#041018] transition enabled:active:scale-[0.98] enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35"
-            >
-              {isLastStep ? t("builder.order") : t("builder.next")}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={goPrev}
+                disabled={isFirstStep}
+                className="min-h-11 flex-1 rounded-xl border border-[var(--border)] px-3 text-sm font-semibold text-[var(--text)] transition enabled:active:scale-[0.98] enabled:hover:border-[var(--cyan)] enabled:hover:text-[var(--cyan)] disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                {t("builder.prev")}
+              </button>
+              <button
+                type="button"
+                onClick={goNextOrBuy}
+                disabled={isLastStep && !canBuySelection(ensureStepChoice(selection))}
+                className="min-h-11 flex-1 rounded-xl bg-[var(--cyan)] px-3 text-sm font-semibold text-[#041018] transition enabled:active:scale-[0.98] enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                {isLastStep ? t("builder.order") : t("builder.next")}
+              </button>
+            </div>
           </div>
-        </nav>
-      )}
-
-      {!pricingOpen && !checkoutOpen && (
-        <button
-          ref={cartBtnRef}
-          type="button"
-          onClick={() => setPricingOpen(true)}
-          aria-expanded={pricingOpen}
-          aria-controls="builder-pricing"
-          aria-label={t("builder.pricing")}
-          className={`fixed z-50 flex h-12 w-12 items-center justify-center rounded-full border border-[var(--border-strong)] bg-[rgba(12,20,34,0.95)] text-[var(--cyan)] shadow-[var(--glow)] backdrop-blur-xl lg:hidden ${
-            cartBump ? "cart-catch" : ""
-          }`}
-          style={{
-            bottom: "calc(6.75rem + env(safe-area-inset-bottom, 0px))",
-            right: "max(1rem, env(safe-area-inset-right))",
-          }}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className="h-6 w-6"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
+          <button
+            ref={cartBtnRef}
+            type="button"
+            onClick={() => setPricingOpen(true)}
+            aria-expanded={pricingOpen}
+            aria-controls="builder-pricing"
+            aria-label={t("builder.pricing")}
+            className={`absolute flex h-14 w-14 items-center justify-center rounded-full border border-[var(--border-strong)] bg-[rgba(12,20,34,0.95)] text-[var(--cyan)] shadow-[var(--glow)] backdrop-blur-xl ${
+              cartBump ? "cart-catch" : ""
+            }`}
+            style={{
+              bottom: "calc(100% + 1.25rem)",
+              right: "1.25rem",
+            }}
           >
-            <circle cx="9" cy="20" r="1.4" fill="currentColor" stroke="none" />
-            <circle cx="18" cy="20" r="1.4" fill="currentColor" stroke="none" />
-            <path d="M3 4h2l2.2 11.2a1.5 1.5 0 0 0 1.5 1.2h9.2a1.5 1.5 0 0 0 1.5-1.2L21 8H7" />
-          </svg>
-        </button>
+            <svg
+              viewBox="0 0 24 24"
+              className="h-7 w-7"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="9" cy="20" r="1.4" fill="currentColor" stroke="none" />
+              <circle cx="18" cy="20" r="1.4" fill="currentColor" stroke="none" />
+              <path d="M3 4h2l2.2 11.2a1.5 1.5 0 0 0 1.5 1.2h9.2a1.5 1.5 0 0 0 1.5-1.2L21 8H7" />
+            </svg>
+          </button>
+        </nav>
       )}
 
       {throwClones.map((item) => (
