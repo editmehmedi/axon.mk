@@ -36,7 +36,6 @@ import {
   ssdQtySlotLimit,
   stepHasNone,
   withOptionalGpuSkipped,
-  withOptionalSsdSkipped,
   type CompatPart,
   type CompatSelection,
 } from "@/lib/compatibility";
@@ -71,6 +70,7 @@ type Part = CompatPart & {
   imageUrl?: string | null;
   includesCooler?: boolean | null;
   source?: "new" | "used";
+  warrantyMonths?: number | null;
 };
 
 function isUsedPart(part: Part | CompatPart | null | undefined): boolean {
@@ -90,6 +90,13 @@ function partLabel(part: Part | CompatPart, usedBadge: string): string {
   if (isNonePart(part)) return part.name;
   if (isUsedPart(part)) return `${usedBadge} · ${part.name}`;
   return `${part.brand ?? ""} ${part.name}`.trim();
+}
+
+function warrantyMonthsOf(part: Part | CompatPart | null | undefined): number | null {
+  if (!part || isNonePart(part) || isStockCoolerPart(part)) return null;
+  const months = "warrantyMonths" in part ? part.warrantyMonths : null;
+  if (isUsedPart(part)) return typeof months === "number" && months > 0 ? months : 3;
+  return typeof months === "number" && months > 0 ? months : null;
 }
 
 const STEP_KEYS: Record<string, string> = {
@@ -124,7 +131,7 @@ const DEFAULT_FILTERS: PartFilterState = {
 };
 
 const PHONE_PAGE_SIZE = 6;
-const PC_PAGE_SIZE = 9;
+const PC_PAGE_SIZE = 15;
 const PAGE_BUTTONS = 6;
 
 function usePcPartsLayout() {
@@ -335,6 +342,7 @@ export default function ConfiguratorPage() {
                 tdpWatts: l.category === "GPU" ? inferListingGpuTdp(l.name) : null,
                 formFactor: null,
                 source: "used" as const,
+                warrantyMonths: 3,
               }) satisfies Part,
           );
         setUsedParts(items);
@@ -569,6 +577,26 @@ export default function ConfiguratorPage() {
   const selectedPsuWattage =
     selection.PSU && !isNonePart(selection.PSU) ? selection.PSU.wattage ?? null : null;
   const realParts = useMemo(() => flattenSelection(selection), [selection]);
+  const warrantyRows = useMemo(() => {
+    const rows: { category: string; months: number | null; included: boolean }[] = [];
+    for (const cat of BUILDER_STEPS) {
+      const key = cat as keyof CompatSelection;
+      const picked = key === "SSD" ? getSsds(selection) : selection[key] ? [selection[key]] : [];
+      for (const part of picked) {
+        if (!part || isNonePart(part)) continue;
+        rows.push({
+          category: cat,
+          months: warrantyMonthsOf(part),
+          included: isStockCoolerPart(part),
+        });
+      }
+    }
+    return rows;
+  }, [selection]);
+  const shortestWarranty = warrantyRows.reduce<number | null>((shortest, row) => {
+    if (row.months == null) return shortest;
+    return shortest == null ? row.months : Math.min(shortest, row.months);
+  }, null);
   const selectedCount = realParts.length;
   const hasOutOfStockPick = realParts.some((p) => {
     if (p.category === "RAM") return (p.stock ?? 0) < ramQtyFor(p);
@@ -674,7 +702,7 @@ export default function ConfiguratorPage() {
   }
 
   async function beginBuy(sel: CompatSelection = selection) {
-    const ready = withOptionalGpuSkipped(withOptionalSsdSkipped(sel));
+    const ready = withOptionalGpuSkipped(sel);
     if (ready !== sel) setSelection(ready);
     if (!canBuySelection(ready)) return;
     if (!(await requireLoginForBuy(ready))) return;
@@ -750,7 +778,6 @@ export default function ConfiguratorPage() {
 
   function goNext() {
     window.clearTimeout(autoNextTimer.current);
-    if (currentCat === "PSU" && !hasRealPsu(selection)) return;
     setSelection((s) => ensureStepChoice(s));
     if (step < BUILDER_STEPS.length - 1) {
       const next = step + 1;
@@ -761,10 +788,8 @@ export default function ConfiguratorPage() {
 
   function jumpToStep(i: number) {
     window.clearTimeout(autoNextTimer.current);
-    const psuIndex = BUILDER_STEPS.indexOf("PSU");
-    const target = i > psuIndex && step <= psuIndex && !hasRealPsu(selection) ? psuIndex : i;
-    setCondition((c) => conditionForStep(target, c));
-    setStep(target);
+    setCondition((c) => conditionForStep(i, c));
+    setStep(i);
   }
 
   function goNextAfterPick() {
@@ -782,7 +807,7 @@ export default function ConfiguratorPage() {
       goNext();
       return;
     }
-    const nextSel = withOptionalGpuSkipped(withOptionalSsdSkipped(ensureStepChoice(selection)));
+    const nextSel = withOptionalGpuSkipped(ensureStepChoice(selection));
     setSelection(nextSel);
     const phone = window.matchMedia("(max-width: 1023px)").matches;
     if (phone) {
@@ -912,8 +937,7 @@ export default function ConfiguratorPage() {
   const isLastStep = step >= BUILDER_STEPS.length - 1;
   const canClear = selectionHasChoice(selection);
   const psuBlocksNext = currentCat === "PSU" && !hasRealPsu(selection);
-  const nextDisabled =
-    psuBlocksNext || (isLastStep && !canBuySelection(ensureStepChoice(selection)));
+  const nextDisabled = isLastStep && !canBuySelection(ensureStepChoice(selection));
 
   async function submitOrder(data: {
     customerName: string;
@@ -989,8 +1013,7 @@ export default function ConfiguratorPage() {
               {i + 1}. {t(STEP_KEYS[cat])}
               {cat === "SSD" && selectedSsd && selectedSsdQty > 1 ? ` ×${selectedSsdQty}` : ""}
               {cat === "RAM" && selectedRam && selectedRamQty > 1 ? ` ×${selectedRamQty}` : ""}
-              {stepHasNone(selection, cat as keyof CompatSelection) ||
-              (cat === "SSD" && !selectedSsd)
+              {stepHasNone(selection, cat as keyof CompatSelection)
                 ? ` · ${t("builder.none")}`
                 : ""}
             </button>
@@ -1027,17 +1050,19 @@ export default function ConfiguratorPage() {
                 const key = cat as keyof CompatSelection;
                 const removeLabel = t("builder.removeItem", { part: t(STEP_KEYS[cat]) });
                 if (key === "SSD") {
-                  if (ssdIsNone(selection) || !selectedSsd) {
-                    const canRemove = ssdIsNone(selection);
+                  if (!selectedSsd) {
+                    const skipped = ssdIsNone(selection);
                     return (
                       <div key={cat} className="flex items-center justify-between gap-2">
                         <span className="text-[var(--text-muted)]">
                           {t(STEP_KEYS[cat])}
-                          <span className="text-[var(--text)]"> · {t("builder.none")}</span>
+                          {skipped ? (
+                            <span className="text-[var(--text)]"> · {t("builder.none")}</span>
+                          ) : null}
                         </span>
                         <span className="flex shrink-0 items-center gap-0.5">
-                          <span className="tabular-nums">{formatPrice(0)}</span>
-                          {canRemove ? (
+                          <span className="tabular-nums">{skipped ? formatPrice(0) : "—"}</span>
+                          {skipped ? (
                             <RemoveItemButton
                               label={removeLabel}
                               onClick={() => removeCategory("SSD")}
@@ -1116,6 +1141,37 @@ export default function ConfiguratorPage() {
                 <span>{t("home.totalPrice")}</span>
                 <span className="text-[var(--cyan)]">{formatPrice(total)}</span>
               </div>
+              {warrantyRows.length > 0 && (
+                <div className="space-y-1.5 border-t border-[var(--border)] pt-3">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-[var(--text-muted)]">{t("builder.warranty")}</span>
+                    <span className="shrink-0 font-semibold text-[var(--mint)]">
+                      {shortestWarranty != null
+                        ? t("builder.warrantyMonths", { months: shortestWarranty })
+                        : "—"}
+                    </span>
+                  </div>
+                  {warrantyRows.map((row) => (
+                    <div key={row.category} className="flex justify-between gap-2 pl-2 text-[11px]">
+                      <span className="text-[var(--text-muted)]">{t(STEP_KEYS[row.category])}</span>
+                      <span
+                        className={`shrink-0 ${
+                          row.months != null ? "text-[var(--mint)]" : "text-[var(--text-muted)]"
+                        }`}
+                      >
+                        {row.included
+                          ? t("builder.warrantyIncluded")
+                          : row.months != null
+                            ? t("builder.warrantyMonths", { months: row.months })
+                            : t("builder.warrantyUnknown")}
+                      </span>
+                    </div>
+                  ))}
+                  <p className="text-[11px] leading-snug text-[var(--text-muted)]">
+                    {t("builder.warrantyHint")}
+                  </p>
+                </div>
+              )}
               <div className="space-y-1.5 border-t border-[var(--border)] pt-3">
                 <div className="flex justify-between gap-2">
                   <span className="text-[var(--text-muted)]">{t("builder.powerUsage")}</span>
@@ -1395,6 +1451,15 @@ export default function ConfiguratorPage() {
                       : part.brand}
                   </p>
                   <p className="mt-0.5 line-clamp-2 text-xs font-medium leading-snug">{part.name}</p>
+                  {isStockCoolerPart(part) ? (
+                    <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">
+                      {t("builder.warrantyIncluded")}
+                    </p>
+                  ) : warrantyMonthsOf(part) != null ? (
+                    <p className="mt-0.5 text-[10px] font-medium text-[var(--mint)]">
+                      {t("builder.warrantyMonths", { months: warrantyMonthsOf(part) ?? 0 })}
+                    </p>
+                  ) : null}
                   {showQty && (
                     <div className="mt-1.5">
                       <QuantityStepper

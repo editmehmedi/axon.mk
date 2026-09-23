@@ -98,6 +98,9 @@ export async function GET() {
 
 const settingsSchema = z.object({
   assemblyFeeMkd: z.number().int().min(0),
+  companyName: z.string().trim().min(1).max(80).optional(),
+  supportPhone: z.string().trim().max(40).optional(),
+  supportViber: z.string().trim().max(40).optional(),
 });
 
 export async function PUT(req: Request) {
@@ -106,7 +109,12 @@ export async function PUT(req: Request) {
     const data = settingsSchema.parse(await req.json());
     const settings = await prisma.siteSettings.update({
       where: { id: 1 },
-      data: { assemblyFeeMkd: data.assemblyFeeMkd },
+      data: {
+        assemblyFeeMkd: data.assemblyFeeMkd,
+        ...(data.companyName != null ? { companyName: data.companyName } : {}),
+        ...(data.supportPhone != null ? { supportPhone: data.supportPhone } : {}),
+        ...(data.supportViber != null ? { supportViber: data.supportViber } : {}),
+      },
     });
     return NextResponse.json({ settings });
   } catch (e) {

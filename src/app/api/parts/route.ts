@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ASSEMBLY_FEE_DEFAULT } from "@/lib/constants";
 import { prisma } from "@/lib/db";
+import { catalogWarrantyMonths } from "@/lib/partWarranty";
 
 export async function GET(req: Request) {
   try {
@@ -15,7 +16,10 @@ export async function GET(req: Request) {
     });
     const settings = await prisma.siteSettings.findUnique({ where: { id: 1 } });
     return NextResponse.json({
-      items,
+      items: items.map((part) => ({
+        ...part,
+        warrantyMonths: catalogWarrantyMonths(part),
+      })),
       assemblyFeeMkd: settings?.assemblyFeeMkd ?? ASSEMBLY_FEE_DEFAULT,
     });
   } catch (e) {

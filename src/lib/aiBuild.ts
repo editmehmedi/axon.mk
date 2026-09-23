@@ -45,6 +45,7 @@ export type AiBuildLine = {
   tdpWatts: number | null;
   formFactor: string | null;
   includesCooler: boolean;
+  warrantyMonths?: number | null;
 };
 
 export type AiBuild = {
@@ -680,7 +681,7 @@ export function aiMinimumBudgets(
   assemblyFeeMkd: number,
 ): Record<AiUseCase, number> {
   const key = `${assemblyFeeMkd}:${parts.length}:${parts.reduce(
-    (sum, part) => sum + part.priceMkd + (part.stock ?? 0),
+    (sum, part) => sum + part.priceMkd + (part.stock ?? 0) + (part.socket?.length ?? 0),
     0,
   )}`;
   const cached = minBudgetCache.aiMinBudgets;

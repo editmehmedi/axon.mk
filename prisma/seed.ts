@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { PrismaClient, Role, OrderStatus } from "../src/generated/prisma";
 import bcrypt from "bcryptjs";
 import { exactPartImagePath } from "../src/lib/exactParts";
-import { buildPrebuiltLineup } from "../src/lib/prebuiltFromParts";
+import { buildPrebuiltLineup, describeReadyPc } from "../src/lib/prebuiltFromParts";
 import { loadAllAnhochParts } from "./anhochInventory";
 
 const prisma = new PrismaClient();
@@ -465,7 +465,7 @@ async function main() {
       data: {
         slug: pc.slug,
         name: pc.name,
-        description: pc.description,
+        description: built ? describeReadyPc(built) : pc.description,
         stock: pc.stock,
         deliveryHours: pc.deliveryHours,
         condition: "new",

@@ -319,6 +319,11 @@ export function AiBuildView({ minimums }: { minimums: Record<AiUseCase, number> 
                           </p>
                           <p className="truncate text-sm font-medium">{label}</p>
                           {spec && <p className="text-xs text-[var(--text-muted)]">{spec}</p>}
+                          {line.warrantyMonths ? (
+                            <p className="text-xs font-medium text-[var(--mint)]">
+                              {t("builder.warrantyMonths", { months: line.warrantyMonths })}
+                            </p>
+                          ) : null}
                         </div>
                         <p className="shrink-0 text-sm">{formatPrice(line.priceMkd * line.qty)}</p>
                       </li>
@@ -348,6 +353,21 @@ export function AiBuildView({ minimums }: { minimums: Record<AiUseCase, number> 
                     <span>{t("ai.total")}</span>
                     <span className="text-[var(--cyan)]">{formatPrice(build.totalMkd)}</span>
                   </div>
+                  {build.lines.some((line) => line.warrantyMonths) && (
+                    <div className="flex justify-between gap-3">
+                      <span className="text-[var(--text-muted)]">{t("builder.warranty")}</span>
+                      <span className="font-semibold text-[var(--mint)]">
+                        {t("builder.warrantyMonths", {
+                          months: Math.min(
+                            ...build.lines
+                              .map((line) => line.warrantyMonths)
+                              .filter((months): months is number => typeof months === "number" && months > 0),
+                          ),
+                        })}
+                      </span>
+                    </div>
+                  )}
+                  <p className="text-[11px] leading-snug text-[var(--text-muted)]">{t("builder.warrantyHint")}</p>
                 </div>
 
                 <div className="mt-4 flex flex-col gap-2 sm:flex-row">

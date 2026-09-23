@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ASSEMBLY_FEE_DEFAULT } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { aiMinimumBudgets, buildAiPc, type AiCatalogPart } from "@/lib/aiBuild";
+import { catalogWarrantyMonths } from "@/lib/partWarranty";
 
 const bodySchema = z.object({
   budgetMkd: z.number().int().positive(),
@@ -31,7 +32,15 @@ export async function POST(req: Request) {
     if (!build) {
       return NextResponse.json({ error: "no_build", minBudgetMkd }, { status: 400 });
     }
-    return NextResponse.json({ build });
+    return NextResponse.json({
+      build: {
+        ...build,
+        lines: build.lines.map((line) => ({
+          ...line,
+          warrantyMonths: catalogWarrantyMonths(line),
+        })),
+      },
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "invalid" }, { status: 400 });

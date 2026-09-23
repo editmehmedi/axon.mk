@@ -11,6 +11,7 @@ import {
   ramKitModuleCount,
   ramQtySlotLimit,
   selectionPriceMkd,
+  socketsNamedOnCooler,
   type CompatPart,
   type CompatSelection,
 } from "@/lib/compatibility";
@@ -63,16 +64,21 @@ function coolerCapacity(part: Part): number | null {
 
 function coolerNameFits(name: string, socket?: string | null): boolean {
   if (!socket) return true;
-  const text = name.toUpperCase();
-  const mentioned = [
-    /AM5/.test(text) ? "AM5" : "",
-    /AM4/.test(text) ? "AM4" : "",
-    /1851/.test(text) ? "LGA1851" : "",
-    /1700/.test(text) ? "LGA1700" : "",
-    /1200/.test(text) ? "LGA1200" : "",
-  ].filter(Boolean);
+  const mentioned = socketsNamedOnCooler(name);
   if (!mentioned.length) return true;
   return mentioned.includes(socket.toUpperCase());
+}
+
+/** Spec line that matches the parts actually in the ready PC. */
+export function describeReadyPc(pc: {
+  cpuLabel: string;
+  gpuLabel: string;
+  ramLabel: string;
+  ssdLabel: string;
+}): string {
+  const cpu = pc.cpuLabel.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  const gpu = /integrated/i.test(pc.gpuLabel) ? "integrated graphics" : pc.gpuLabel.trim();
+  return `Ready PC with ${cpu}, ${gpu}, ${pc.ramLabel.trim()} and ${pc.ssdLabel.trim()}. Built and tested, with warranty. Cash on delivery in North Macedonia.`;
 }
 
 function ramSpeedMhz(name: string): number {

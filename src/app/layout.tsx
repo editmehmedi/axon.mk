@@ -4,6 +4,8 @@ import { Navbar } from "@/components/Navbar";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { CurrencyProvider } from "@/components/CurrencyProvider";
 import { SiteFooter } from "@/components/SiteFooter";
+import { prisma } from "@/lib/db";
+import { publicPhone } from "@/lib/shopContact";
 import "./globals.css";
 
 const display = Space_Grotesk({
@@ -36,7 +38,8 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const settings = await prisma.siteSettings.findUnique({ where: { id: 1 } });
   return (
     <html
       lang="en"
@@ -47,7 +50,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <CurrencyProvider>
             <Navbar />
             <main className="flex-1">{children}</main>
-            <SiteFooter />
+            <SiteFooter
+              companyName={settings?.companyName?.trim() || "AXON.MK"}
+              phone={publicPhone(settings?.supportPhone)}
+              viber={publicPhone(settings?.supportViber)}
+            />
           </CurrencyProvider>
         </LanguageProvider>
       </body>

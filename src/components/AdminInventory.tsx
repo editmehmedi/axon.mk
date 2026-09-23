@@ -6,6 +6,22 @@ import { useI18n } from "@/components/LanguageProvider";
 import { ProductImage } from "@/components/ProductImage";
 import { resolvePartImage } from "@/lib/partImages";
 import { AdminImageField } from "@/components/AdminImageField";
+import {
+  checkCompatibility,
+  clampRamQty,
+  cpuHasIntegratedGraphics,
+  cpuNeedsCooler,
+  createNonePart,
+  filterCompatibleParts,
+  hasBlockingErrors,
+  isNonePart,
+  pruneIncompatibleSelection,
+  ramQtySlotLimit,
+  selectionPriceMkd,
+  type CompatPart,
+  type CompatSelection,
+} from "@/lib/compatibility";
+import { describeReadyPc, PREBUILT_MARKUP } from "@/lib/prebuiltFromParts";
 
 export type AdminPart = {
   id: string;
@@ -19,6 +35,7 @@ export type AdminPart = {
   wattage?: number | null;
   tdpWatts?: number | null;
   formFactor?: string | null;
+  includesCooler?: boolean | null;
   imageUrl?: string | null;
   active?: boolean;
 };
@@ -43,6 +60,36 @@ type Prebuilt = {
   active?: boolean;
 };
 
+const SLOT_FIELDS = [
+  ["CPU", "cpuLabel", "admin.fieldCpu"],
+  ["COOLER", "coolerLabel", "admin.fieldCooler"],
+  ["MOTHERBOARD", "motherboardLabel", "admin.fieldMotherboard"],
+  ["RAM", "ramLabel", "admin.fieldRam"],
+  ["GPU", "gpuLabel", "admin.fieldGpu"],
+  ["SSD", "ssdLabel", "admin.fieldSsd"],
+  ["PSU", "psuLabel", "admin.fieldPsu"],
+  ["CASE", "caseLabel", "admin.fieldCase"],
+] as const;
+
+type SlotId = (typeof SLOT_FIELDS)[number][0];
+type SlotMap = Record<SlotId, string>;
+
+const IGPU = "__igpu";
+const STOCK_COOLER = "__stock";
+
+function emptySlots(): SlotMap {
+  return {
+    CPU: "",
+    COOLER: "",
+    MOTHERBOARD: "",
+    RAM: "",
+    GPU: "",
+    SSD: "",
+    PSU: "",
+    CASE: "",
+  };
+}
+
 type PrebuiltDraft = {
   name: string;
   description: string;
@@ -59,6 +106,11 @@ type PrebuiltDraft = {
   imageUrl: string;
   condition: "new" | "used";
   conditionGrade: string;
+  slots: SlotMap;
+  ramQty: number;
+  priceManual: boolean;
+  imageManual: boolean;
+  autoDescription: string;
 };
 
 const emptyPrebuiltDraft = (): PrebuiltDraft => ({
@@ -77,9 +129,63 @@ const emptyPrebuiltDraft = (): PrebuiltDraft => ({
   imageUrl: "",
   condition: "new",
   conditionGrade: "",
+  slots: emptySlots(),
+  ramQty: 1,
+  priceManual: false,
+  imageManual: false,
+  autoDescription: "",
 });
 
-function draftFromPrebuilt(p: Prebuilt): PrebuiltDraft {
+function partLine(part: { brand: string; name: string }): string {
+  return `${part.brand} ${part.name}`.replace(/\s+/g, " ").trim();
+}
+
+function toCompatPart(part: AdminPart): CompatPart {
+  return {
+    id: part.id,
+    category: part.category,
+    name: part.name,
+    brand: part.brand,
+    socket: part.socket,
+    ramType: part.ramType,
+    wattage: part.wattage,
+    tdpWatts: part.tdpWatts,
+    formFactor: part.formFactor,
+    includesCooler: part.includesCooler,
+    priceMkd: part.priceMkd,
+    stock: part.stock,
+  };
+}
+
+function matchSlot(parts: AdminPart[], category: SlotId, label: string): { id: string; ramQty?: number } {
+  const raw = label.trim();
+  if (!raw) return { id: "" };
+  if (category === "GPU" && /integrated/i.test(raw)) return { id: IGPU };
+  if (category === "COOLER" && /included/i.test(raw)) return { id: STOCK_COOLER };
+  let text = raw;
+  let ramQty: number | undefined;
+  const qtyMatch = raw.match(/^(.*)\s*[×x]\s*(\d+)\s*$/i);
+  if (qtyMatch && category === "RAM") {
+    text = qtyMatch[1].trim();
+    ramQty = Number(qtyMatch[2]) || 1;
+  }
+  const norm = text.toLowerCase();
+  const hit = parts.find(
+    (part) => part.category === category && partLine(part).toLowerCase() === norm,
+  );
+  return { id: hit?.id ?? "", ramQty };
+}
+
+function draftFromPrebuilt(p: Prebuilt, parts: AdminPart[]): PrebuiltDraft {
+  const slots = emptySlots();
+  let ramQty = 1;
+  if (p.condition !== "used") {
+    for (const [category, key] of SLOT_FIELDS) {
+      const matched = matchSlot(parts, category, p[key] || "");
+      slots[category] = matched.id;
+      if (matched.ramQty) ramQty = matched.ramQty;
+    }
+  }
   return {
     name: p.name || "",
     description: p.description || "",
@@ -96,7 +202,166 @@ function draftFromPrebuilt(p: Prebuilt): PrebuiltDraft {
     imageUrl: p.imageUrl || "",
     condition: p.condition === "used" ? "used" : "new",
     conditionGrade: p.conditionGrade || "",
+    slots,
+    ramQty,
+    priceManual: true,
+    imageManual: Boolean(p.imageUrl),
+    autoDescription: "",
   };
+}
+
+function selectionFromSlots(slots: SlotMap, parts: AdminPart[]): CompatSelection {
+  const pick = (id: string) => {
+    const part = parts.find((item) => item.id === id);
+    return part ? toCompatPart(part) : null;
+  };
+  const sel: CompatSelection = {};
+  const cpu = pick(slots.CPU);
+  if (cpu) sel.CPU = cpu;
+  if (slots.COOLER === STOCK_COOLER) sel.COOLER = createNonePart("COOLER");
+  else {
+    const cooler = pick(slots.COOLER);
+    if (cooler) sel.COOLER = cooler;
+  }
+  if (slots.GPU === IGPU) sel.GPU = createNonePart("GPU");
+  else {
+    const gpu = pick(slots.GPU);
+    if (gpu) sel.GPU = gpu;
+  }
+  const board = pick(slots.MOTHERBOARD);
+  if (board) sel.MOTHERBOARD = board;
+  const ram = pick(slots.RAM);
+  if (ram) sel.RAM = ram;
+  const psu = pick(slots.PSU);
+  if (psu) sel.PSU = psu;
+  const pcCase = pick(slots.CASE);
+  if (pcCase) sel.CASE = pcCase;
+  const ssd = pick(slots.SSD);
+  if (ssd) sel.SSD = [ssd];
+  return sel;
+}
+
+function slotsFromSelection(sel: CompatSelection, prev: SlotMap): SlotMap {
+  const single = (key: Exclude<SlotId, "SSD">, special?: string): string => {
+    const value = sel[key];
+    if (!value || Array.isArray(value)) return "";
+    if (isNonePart(value)) return special && prev[key] === special ? special : "";
+    return value.id;
+  };
+  const ssd = sel.SSD?.find((part) => !isNonePart(part));
+  return {
+    CPU: single("CPU"),
+    COOLER: single("COOLER", STOCK_COOLER),
+    MOTHERBOARD: single("MOTHERBOARD"),
+    RAM: single("RAM"),
+    GPU: single("GPU", IGPU),
+    SSD: ssd?.id ?? "",
+    PSU: single("PSU"),
+    CASE: single("CASE"),
+  };
+}
+
+function slotLabel(category: SlotId, id: string, parts: AdminPart[], ramQty: number): string {
+  if (id === IGPU) return "Integrated graphics";
+  if (id === STOCK_COOLER) return "Included with CPU";
+  const part = parts.find((item) => item.id === id);
+  if (!part) return "";
+  const base = partLine(part);
+  const labeled = category === "RAM" && ramQty > 1 ? `${base} ×${ramQty}` : base;
+  return labeled.slice(0, 120);
+}
+
+function withCatalogSelection(
+  draft: PrebuiltDraft,
+  parts: AdminPart[],
+  patch: { slots?: SlotMap; ramQty?: number; changed?: SlotId },
+): PrebuiltDraft {
+  let slots = { ...draft.slots, ...(patch.slots ?? {}) };
+  let sel = selectionFromSlots(slots, parts);
+  if (patch.changed) {
+    sel = pruneIncompatibleSelection(sel, patch.changed);
+    slots = slotsFromSelection(sel, slots);
+  }
+
+  const cpu = sel.CPU && !isNonePart(sel.CPU) ? sel.CPU : null;
+  if (slots.GPU === IGPU && (!cpu || !cpuHasIntegratedGraphics(cpu))) {
+    slots = { ...slots, GPU: "" };
+  }
+  if (slots.COOLER === STOCK_COOLER && (!cpu || cpuNeedsCooler(cpu))) {
+    slots = { ...slots, COOLER: "" };
+  }
+  if (patch.changed === "CPU" && cpu && !cpuNeedsCooler(cpu) && !slots.COOLER) {
+    slots = { ...slots, COOLER: STOCK_COOLER };
+  }
+  sel = selectionFromSlots(slots, parts);
+
+  let ramQty = patch.ramQty ?? draft.ramQty;
+  const ram = sel.RAM && !isNonePart(sel.RAM) ? sel.RAM : null;
+  const board = sel.MOTHERBOARD && !isNonePart(sel.MOTHERBOARD) ? sel.MOTHERBOARD : null;
+  ramQty = ram ? clampRamQty(ramQty || 1, ram.stock, ramQtySlotLimit(board, ram)) : Math.max(1, ramQty || 1);
+
+  const next: PrebuiltDraft = { ...draft, slots, ramQty };
+  for (const [category, key] of SLOT_FIELDS) {
+    const id = slots[category];
+    if (id) next[key] = slotLabel(category, id, parts, ramQty);
+    else if (draft.slots[category]) next[key] = "";
+  }
+
+  const cost = selectionPriceMkd(sel, ramQty, 1);
+  if (!draft.priceManual && cost > 0) next.priceMkd = Math.round(cost * PREBUILT_MARKUP);
+
+  if (next.cpuLabel && next.gpuLabel && next.ramLabel && next.ssdLabel) {
+    const auto = describeReadyPc({
+      cpuLabel: next.cpuLabel,
+      gpuLabel: next.gpuLabel,
+      ramLabel: next.ramLabel,
+      ssdLabel: next.ssdLabel,
+    }).slice(0, 500);
+    if (!draft.description.trim() || draft.description === draft.autoDescription) {
+      next.description = auto;
+      next.autoDescription = auto;
+    }
+  }
+
+  if (!draft.imageManual) {
+    const pcCase = slots.CASE ? parts.find((part) => part.id === slots.CASE) : undefined;
+    next.imageUrl = pcCase?.imageUrl || "";
+  }
+
+  return next;
+}
+
+function selectionForCheck(draft: PrebuiltDraft, parts: AdminPart[]): CompatSelection {
+  const sel = selectionFromSlots(draft.slots, parts);
+  if (!sel.COOLER && draft.coolerLabel.trim()) {
+    sel.COOLER = {
+      id: "label-cooler",
+      category: "COOLER",
+      name: draft.coolerLabel,
+      brand: "",
+      tdpWatts: 300,
+    };
+  }
+  return sel;
+}
+
+function slotOptions(parts: AdminPart[], category: SlotId, draft: PrebuiltDraft): AdminPart[] {
+  const selected = draft.slots[category];
+  const compatible = filterCompatibleParts(
+    parts.map(toCompatPart),
+    category,
+    selectionFromSlots(draft.slots, parts),
+  );
+  const allowed = new Set(compatible.map((part) => part.id));
+  return parts
+    .filter(
+      (part) =>
+        part.category === category &&
+        (part.active !== false || part.id === selected) &&
+        (allowed.has(part.id) || part.id === selected),
+    )
+    .slice()
+    .sort((a, b) => Number(a.stock <= 0) - Number(b.stock <= 0) || a.priceMkd - b.priceMkd);
 }
 
 function pillClass(active: boolean) {
@@ -226,6 +491,8 @@ function PrebuiltListRow({
 function PrebuiltForm({
   draft,
   setDraft,
+  parts,
+  fromCatalog,
   busy,
   showConditionGrade,
   title,
@@ -235,6 +502,8 @@ function PrebuiltForm({
 }: {
   draft: PrebuiltDraft;
   setDraft: Dispatch<SetStateAction<PrebuiltDraft>>;
+  parts: AdminPart[];
+  fromCatalog: boolean;
   busy: boolean;
   showConditionGrade: boolean;
   title: string;
@@ -243,6 +512,11 @@ function PrebuiltForm({
   onCancel?: () => void;
 }) {
   const { t } = useI18n();
+  const sel = fromCatalog ? selectionForCheck(draft, parts) : null;
+  const issues = sel ? checkCompatibility(sel, { ramQty: draft.ramQty }) : [];
+  const partsCost = sel ? selectionPriceMkd(selectionFromSlots(draft.slots, parts), draft.ramQty, 1) : 0;
+  const suggested = partsCost > 0 ? Math.round(partsCost * PREBUILT_MARKUP) : 0;
+  const cpu = parts.find((part) => part.id === draft.slots.CPU);
   return (
     <div className="glass mb-4 space-y-4 rounded-2xl p-4">
       <p className="text-sm font-medium text-[var(--cyan)]">{title}</p>
@@ -271,36 +545,143 @@ function PrebuiltForm({
           />
         </Field>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {(
-          [
-            ["cpuLabel", t("admin.fieldCpu")],
-            ["coolerLabel", t("admin.fieldCooler")],
-            ["motherboardLabel", t("admin.fieldMotherboard")],
-            ["ramLabel", t("admin.fieldRam")],
-            ["gpuLabel", t("admin.fieldGpu")],
-            ["ssdLabel", t("admin.fieldSsd")],
-            ["psuLabel", t("admin.fieldPsu")],
-            ["caseLabel", t("admin.fieldCase")],
-          ] as const
-        ).map(([key, label]) => (
-          <Field key={key} label={label}>
-            <input
-              className="input !py-2 !text-sm"
-              value={draft[key]}
-              onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
-            />
-          </Field>
-        ))}
-      </div>
+      {fromCatalog ? (
+        <>
+          <p className="text-xs text-[var(--text-muted)]">{t("admin.pickFromBuilder")}</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {SLOT_FIELDS.map(([slot, labelKey, titleKey]) => {
+              const options = slotOptions(parts, slot, draft);
+              const showIgpu = slot === "GPU" && Boolean(cpu && cpuHasIntegratedGraphics(toCompatPart(cpu)));
+              const showStock = slot === "COOLER" && Boolean(cpu && !cpuNeedsCooler(toCompatPart(cpu)));
+              const unmatched = !draft.slots[slot] && draft[labelKey].trim();
+              const ramPart = slot === "RAM" ? parts.find((part) => part.id === draft.slots.RAM) : undefined;
+              const board = parts.find((part) => part.id === draft.slots.MOTHERBOARD);
+              const ramMax = ramPart
+                ? clampRamQty(99, ramPart.stock, ramQtySlotLimit(board ? toCompatPart(board) : null, ramPart))
+                : 1;
+              return (
+                <Field key={slot} label={t(titleKey)}>
+                  <select
+                    className="input !py-2 !text-sm"
+                    value={draft.slots[slot]}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setDraft((current) =>
+                        withCatalogSelection(current, parts, {
+                          slots: { ...current.slots, [slot]: id },
+                          changed: slot,
+                        }),
+                      );
+                    }}
+                  >
+                    <option value="">{t("admin.selectPart")}</option>
+                    {showIgpu && <option value={IGPU}>{t("admin.integratedGraphics")}</option>}
+                    {showStock && <option value={STOCK_COOLER}>{t("admin.includedCooler")}</option>}
+                    {options.map((part) => (
+                      <option key={part.id} value={part.id}>
+                        {part.brand} {part.name} — {formatMkd(part.priceMkd)}
+                        {part.stock <= 0
+                          ? ` (${t("admin.outOfStock")})`
+                          : ` (${t("admin.stockCount", { count: part.stock })})`}
+                      </option>
+                    ))}
+                  </select>
+                  {slot === "RAM" && draft.slots.RAM && (
+                    <label className="mt-2 block">
+                      <span className="mb-1 block text-[11px] text-[var(--text-muted)]">{t("admin.ramKits")}</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={ramMax}
+                        className="input !py-2 !text-sm"
+                        value={draft.ramQty}
+                        onChange={(e) =>
+                          setDraft((current) =>
+                            withCatalogSelection(current, parts, { ramQty: Number(e.target.value) || 1 }),
+                          )
+                        }
+                      />
+                    </label>
+                  )}
+                  {unmatched && (
+                    <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                      {t("admin.unmatchedSpec", { label: draft[labelKey] })}
+                    </p>
+                  )}
+                  {!options.length && !showIgpu && !showStock && (
+                    <p className="mt-1 text-[11px] text-[var(--text-muted)]">{t("admin.noCompatibleParts")}</p>
+                  )}
+                </Field>
+              );
+            })}
+          </div>
+          {issues.length > 0 && (
+            <ul className="space-y-1 text-xs">
+              {issues.map((issue) => (
+                <li
+                  key={issue.message}
+                  className={issue.severity === "error" ? "text-[var(--danger)]" : "text-[var(--warn)]"}
+                >
+                  {issue.message}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {(
+            [
+              ["cpuLabel", t("admin.fieldCpu")],
+              ["coolerLabel", t("admin.fieldCooler")],
+              ["motherboardLabel", t("admin.fieldMotherboard")],
+              ["ramLabel", t("admin.fieldRam")],
+              ["gpuLabel", t("admin.fieldGpu")],
+              ["ssdLabel", t("admin.fieldSsd")],
+              ["psuLabel", t("admin.fieldPsu")],
+              ["caseLabel", t("admin.fieldCase")],
+            ] as const
+          ).map(([key, label]) => (
+            <Field key={key} label={label}>
+              <input
+                className="input !py-2 !text-sm"
+                value={draft[key]}
+                onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
+              />
+            </Field>
+          ))}
+        </div>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t("admin.fieldPrice")}>
           <input
             type="number"
             className="input !py-2 !text-sm"
             value={draft.priceMkd || ""}
-            onChange={(e) => setDraft((d) => ({ ...d, priceMkd: Number(e.target.value) || 0 }))}
+            onChange={(e) =>
+              setDraft((d) => ({ ...d, priceMkd: Number(e.target.value) || 0, priceManual: true }))
+            }
           />
+          {fromCatalog && suggested > 0 && (
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <p className="text-[11px] text-[var(--text-muted)]">
+                {t("admin.partsCostLine", { cost: formatMkd(partsCost), price: formatMkd(suggested) })}
+              </p>
+              {draft.priceManual && draft.priceMkd !== suggested && (
+                <button
+                  type="button"
+                  className="text-[11px] text-[var(--cyan)] underline"
+                  onClick={() =>
+                    setDraft((current) =>
+                      withCatalogSelection({ ...current, priceManual: false }, parts, {}),
+                    )
+                  }
+                >
+                  {t("admin.useSuggestedPrice")}
+                </button>
+              )}
+            </div>
+          )}
         </Field>
         <Field label={t("admin.fieldStock")}>
           <input
@@ -313,7 +694,7 @@ function PrebuiltForm({
       </div>
       <AdminImageField
         value={draft.imageUrl}
-        onChange={(url) => setDraft((d) => ({ ...d, imageUrl: url }))}
+        onChange={(url) => setDraft((d) => ({ ...d, imageUrl: url, imageManual: true }))}
         previewAlt={draft.name || "PC"}
       />
       <div className="flex flex-wrap gap-2">
@@ -508,7 +889,7 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
   function startEditPrebuilt(p: Prebuilt) {
     setAddingPrebuilt(false);
     setEditingPrebuiltId(p.id);
-    setPrebuiltDraft(draftFromPrebuilt(p));
+    setPrebuiltDraft(draftFromPrebuilt(p, parts));
   }
 
   function cancelPrebuiltForm() {
@@ -740,6 +1121,10 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
       !prebuiltDraft.ssdLabel.trim()
     ) {
       onMessage(t("admin.prebuiltRequired"));
+      return;
+    }
+    if (prebuiltDraft.condition === "new" && hasBlockingErrors(checkCompatibility(selectionForCheck(prebuiltDraft, parts), { ramQty: prebuiltDraft.ramQty }))) {
+      onMessage(t("admin.prebuiltCompat"));
       return;
     }
 
@@ -1161,6 +1546,8 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
             <PrebuiltForm
               draft={prebuiltDraft}
               setDraft={setPrebuiltDraft}
+              parts={parts}
+              fromCatalog={view === "prebuilts"}
               busy={busy}
               showConditionGrade={view === "used"}
               title={

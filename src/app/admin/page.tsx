@@ -92,7 +92,12 @@ type AdminData = {
     active?: boolean;
   }[];
   users: { id: string; email: string; name: string; role: string; isHeadAdmin: boolean }[];
-  settings: { assemblyFeeMkd: number } | null;
+  settings: {
+    assemblyFeeMkd: number;
+    companyName?: string;
+    supportPhone?: string;
+    supportViber?: string;
+  } | null;
   analytics: { revenue: number; orderCount: number; byStatus: Record<string, number> };
 };
 
@@ -155,6 +160,9 @@ export default function AdminPage() {
   const [ordersView, setOrdersView] = useState<"active" | "done">("active");
   const [me, setMe] = useState<{ role: string } | null>(null);
   const [fee, setFee] = useState(2999);
+  const [companyName, setCompanyName] = useState("AXON.MK");
+  const [supportPhone, setSupportPhone] = useState("");
+  const [supportViber, setSupportViber] = useState("");
   const [msg, setMsg] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [bought, setBought] = useState<Record<string, boolean>>({});
@@ -168,6 +176,9 @@ export default function AdminPage() {
     }
     setData(json);
     setFee(json.settings?.assemblyFeeMkd ?? 2999);
+    setCompanyName(json.settings?.companyName ?? "AXON.MK");
+    setSupportPhone(json.settings?.supportPhone ?? "");
+    setSupportViber(json.settings?.supportViber ?? "");
   }
 
   useEffect(() => {
@@ -218,14 +229,19 @@ export default function AdminPage() {
     const res = await fetch("/api/admin", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ assemblyFeeMkd: fee }),
+      body: JSON.stringify({
+        assemblyFeeMkd: fee,
+        companyName,
+        supportPhone,
+        supportViber,
+      }),
     });
     const j = await res.json();
     if (!res.ok) {
       setMsg(j.error || "Error");
       return;
     }
-    setMsg(t("admin.feeSaved"));
+    setMsg(t("admin.contactSaved"));
     await load();
   }
 
@@ -654,10 +670,39 @@ export default function AdminPage() {
               disabled={!isHead}
               onChange={(e) => setFee(Number(e.target.value))}
             />
-            <button disabled={!isHead} onClick={saveFee} className="btn btn-primary">
-              {t("admin.save")}
-            </button>
           </div>
+          <h2 className="section-title mt-8 text-lg">{t("policies.contactTitle")}</h2>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">{t("admin.contactHint")}</p>
+          <label className="mt-4 block text-xs text-[var(--text-muted)]">
+            {t("admin.companyName")}
+            <input
+              className="input mt-1"
+              value={companyName}
+              disabled={!isHead}
+              onChange={(e) => setCompanyName(e.target.value)}
+            />
+          </label>
+          <label className="mt-3 block text-xs text-[var(--text-muted)]">
+            {t("admin.supportPhone")}
+            <input
+              className="input mt-1"
+              value={supportPhone}
+              disabled={!isHead}
+              onChange={(e) => setSupportPhone(e.target.value)}
+            />
+          </label>
+          <label className="mt-3 block text-xs text-[var(--text-muted)]">
+            {t("admin.supportViber")}
+            <input
+              className="input mt-1"
+              value={supportViber}
+              disabled={!isHead}
+              onChange={(e) => setSupportViber(e.target.value)}
+            />
+          </label>
+          <button disabled={!isHead} onClick={saveFee} className="btn btn-primary mt-4">
+            {t("admin.save")}
+          </button>
           <p className="mt-4 text-xs text-[var(--text-muted)]">{t("admin.supplierNote")}</p>
         </div>
       )}

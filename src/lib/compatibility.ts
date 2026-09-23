@@ -517,8 +517,9 @@ export function isCompatibleOption(
       if (!cpu?.includesCooler) return false;
       return true;
     }
-    // Socket: e.g. CK-11509 is Intel-only — block with Ryzen AM5
-    if (cpu?.socket && part.socket && !coolerSupportsSocket(part.socket, cpu.socket)) {
+    // Name wins when it names a socket ("Alpine 23 /AM5") even if the stored
+    // socket list is wider (AM5,AM4).
+    if (cpu?.socket && !coolerFitsCpu(part, cpu.socket)) {
       return false;
     }
     const cpuTdp = cpu?.tdpWatts;
@@ -529,6 +530,29 @@ export function isCompatibleOption(
     }
   }
 
+  return true;
+}
+
+/** Sockets written on the cooler name, e.g. "Alpine 23 /AM5" → ["AM5"]. */
+export function socketsNamedOnCooler(name: string): string[] {
+  const n = name.toLowerCase();
+  const socks: string[] = [];
+  if (/\bam5\b/.test(n)) socks.push("AM5");
+  if (/\bam4\b/.test(n)) socks.push("AM4");
+  if (/\b(?:lga\s*)?1851\b/.test(n)) socks.push("LGA1851");
+  if (/\b(?:lga\s*)?1700\b/.test(n)) socks.push("LGA1700");
+  if (/\b(?:lga\s*)?1200\b/.test(n)) socks.push("LGA1200");
+  if (/\b(?:lga\s*)?115[0156]\b/.test(n)) socks.push("LGA1151");
+  return socks;
+}
+
+function coolerFitsCpu(
+  part: { name: string; socket?: string | null },
+  cpuSocket: string,
+): boolean {
+  const named = socketsNamedOnCooler(part.name);
+  if (named.length && !named.includes(cpuSocket.trim().toUpperCase())) return false;
+  if (part.socket && !coolerSupportsSocket(part.socket, cpuSocket)) return false;
   return true;
 }
 
@@ -682,10 +706,14 @@ export function checkCompatibility(
   }
 
   if (cpu && cooler) {
-    if (cooler.socket && cpu.socket && !coolerSupportsSocket(cooler.socket, cpu.socket)) {
+    const named = socketsNamedOnCooler(cooler.name);
+    const nameMismatch =
+      Boolean(cpu.socket) && named.length > 0 && !named.includes(cpu.socket!.trim().toUpperCase());
+    if (nameMismatch || (cooler.socket && cpu.socket && !coolerSupportsSocket(cooler.socket, cpu.socket))) {
+      const supports = nameMismatch ? named.join(", ") : cooler.socket;
       issues.push({
         severity: "error",
-        message: `Cooler socket mismatch: cooler supports ${cooler.socket}, CPU is ${cpu.socket}`,
+        message: `Cooler socket mismatch: cooler supports ${supports}, CPU is ${cpu.socket}`,
       });
     } else if (isStockCoolerPart(cooler) && cpuNeedsCooler(cpu)) {
       issues.push({
