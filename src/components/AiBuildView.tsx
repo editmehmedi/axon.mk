@@ -254,7 +254,9 @@ export function AiBuildView() {
             onChange={(e) => setBudgetText(e.target.value)}
             className="mt-2 w-full rounded-xl border border-[var(--border)] bg-[rgba(7,11,18,0.55)] px-3 py-2.5 text-base outline-none focus:border-[var(--cyan)]"
           />
-          <p className="mt-1.5 text-xs text-[var(--text-muted)]">{t("ai.budgetHint")}</p>
+          <p className="mt-1.5 text-xs text-[var(--text-muted)]">
+            {t("ai.budgetHint", { amount: formatPrice(AI_MIN_BUDGET_MKD) })}
+          </p>
 
           <p className="mt-4 text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
             {t("ai.presets")}

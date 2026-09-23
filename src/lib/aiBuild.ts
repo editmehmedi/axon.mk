@@ -165,6 +165,13 @@ function buyable(part: AiCatalogPart): boolean {
   return (part.stock ?? 0) > 0 && (part.priceMkd ?? 0) > 0;
 }
 
+/** GeForce GT 210/710/1030 and similar. GTX and RTX stay allowed. */
+function isLegacyGtGpu(part: { name: string; brand?: string | null }): boolean {
+  const compact = `${part.brand ?? ""} ${part.name}`.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (compact.includes("gtx") || compact.includes("rtx")) return false;
+  return /gt\d{3,4}/.test(compact);
+}
+
 function priceOf(part: CompatPart | null | undefined): number {
   if (!part || isNonePart(part)) return 0;
   return part.priceMkd ?? 0;
@@ -469,7 +476,12 @@ export function buildAiPc(
   const weights = WEIGHTS[input.useCase];
   const catalog = parts.filter((part) => !isNonePart(part));
   const cpus = catalog.filter((part) => part.category === "CPU" && buyable(part));
-  const gpus = catalog.filter((part) => part.category === "GPU" && buyable(part));
+  const gpus = catalog.filter(
+    (part) =>
+      part.category === "GPU" &&
+      buyable(part) &&
+      !(input.useCase === "gaming" && isLegacyGtGpu(part)),
+  );
 
   const candidates: Filled[] = [];
   const consider = (cpu: AiCatalogPart, gpu: AiCatalogPart | null, relaxedQuality: boolean) => {
