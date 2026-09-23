@@ -98,19 +98,19 @@ async function main() {
     `Seeding ${parts.length} parts (CPU/GPU/RAM merged cheapest across Anhoch+Setec+Gjirafa+Neptun)`,
   );
 
-  const catalogParts = parts.map((part) => {
+  const catalogParts = parts.map((part, index) => {
     const { source: _source, ...rest } = part;
     return {
       ...rest,
+      id: `seed-${index}`,
       imageUrl: rest.imageUrl || exactPartImagePath(rest.brand, rest.name),
     };
   });
 
   for (const part of catalogParts) {
-    await prisma.part.create({ data: part });
+    const { id: _id, ...data } = part;
+    await prisma.part.create({ data });
   }
-
-  const lineup = buildPrebuiltLineup(catalogParts, prebuilts.length);
 
   // 20 ready-to-ship builds, cheapest → most expensive (MKD)
   const prebuilts = [
@@ -455,6 +455,8 @@ async function main() {
       deliveryHours: 24,
     },
   ];
+
+  const lineup = buildPrebuiltLineup(catalogParts, prebuilts.length);
 
   for (let i = 0; i < prebuilts.length; i++) {
     const pc = prebuilts[i];
