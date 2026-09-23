@@ -11,7 +11,7 @@ import { ProductImage } from "@/components/ProductImage";
 import { rememberTrackingCode } from "@/components/LiveBuildPipeline";
 import { loginUrl } from "@/lib/clientAuth";
 import { saveBuilderDraft } from "@/lib/builderDraft";
-import { AI_MIN_BUDGET_MKD, AI_USE_CASES, type AiBuild, type AiBuildLine, type AiUseCase } from "@/lib/aiBuild";
+import { AI_USE_CASES, type AiBuild, type AiBuildLine, type AiUseCase } from "@/lib/aiBuild";
 import { BUILDER_STEPS } from "@/lib/constants";
 import { convertFromMkd, type CurrencyCode } from "@/lib/currency";
 import { isStockCoolerPart, ramKitLabel } from "@/lib/compatibility";
@@ -55,7 +55,7 @@ function specOf(line: AiBuildLine, stockCooler: string): string {
   return "";
 }
 
-export function AiBuildView() {
+export function AiBuildView({ minimums }: { minimums: Record<AiUseCase, number> }) {
   const { t } = useI18n();
   const { currency, rates, formatPrice } = useCurrency();
   const router = useRouter();
@@ -98,8 +98,8 @@ export function AiBuildView() {
   async function buildPc() {
     const budget = budgetMkd();
     setError("");
-    if (budget < AI_MIN_BUDGET_MKD) {
-      setError(t("ai.error.low", { amount: formatPrice(AI_MIN_BUDGET_MKD) }));
+    if (budget < minimums[useCase]) {
+      setError(t("ai.error.low", { amount: formatPrice(minimums[useCase]) }));
       return;
     }
     setLoading(true);
@@ -112,7 +112,7 @@ export function AiBuildView() {
       const json = await res.json();
       if (!res.ok) {
         if (json.error === "budget_low") {
-          setError(t("ai.error.low", { amount: formatPrice(json.minBudgetMkd ?? AI_MIN_BUDGET_MKD) }));
+          setError(t("ai.error.low", { amount: formatPrice(json.minBudgetMkd ?? minimums[useCase]) }));
         } else if (json.error === "no_build") {
           setError(t("ai.error.none"));
         } else {
@@ -255,7 +255,7 @@ export function AiBuildView() {
             className="mt-2 w-full rounded-xl border border-[var(--border)] bg-[rgba(7,11,18,0.55)] px-3 py-2.5 text-base outline-none focus:border-[var(--cyan)]"
           />
           <p className="mt-1.5 text-xs text-[var(--text-muted)]">
-            {t("ai.budgetHint", { amount: formatPrice(AI_MIN_BUDGET_MKD) })}
+            {t("ai.budgetHint", { amount: formatPrice(minimums[useCase]) })}
           </p>
 
           <p className="mt-4 text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">

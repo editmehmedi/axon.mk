@@ -196,6 +196,23 @@ function pickNearTarget<T extends { priceMkd: number }>(
   })[0];
 }
 
+function edgePicks<T extends { priceMkd: number }>(
+  items: T[],
+  score: (item: T) => number,
+  maxPrice: number,
+  count: number,
+): T[] {
+  const pool = items.filter((item) => item.priceMkd > 0 && item.priceMkd <= maxPrice);
+  if (!pool.length) return [];
+  const cheapest = pool.slice().sort((a, b) => a.priceMkd - b.priceMkd).slice(0, count);
+  const strongest = pool.slice().sort((a, b) => score(b) - score(a)).slice(0, count);
+  const picks: T[] = [];
+  for (const item of [...cheapest, ...strongest]) {
+    if (!picks.includes(item)) picks.push(item);
+  }
+  return picks;
+}
+
 function spreadPicks<T extends { priceMkd: number }>(
   items: T[],
   score: (item: T) => number,
@@ -231,6 +248,8 @@ function completeBuild(
   partsBudget: number,
   cpu: AiCatalogPart,
   gpu: AiCatalogPart | null,
+  preferCheap = false,
+  relaxed = false,
 ): Filled | null {
   const weights = WEIGHTS[useCase];
   const sel: CompatSelection = {
@@ -269,24 +288,28 @@ function completeBuild(
   );
   const socketBoards = cpu.socket ? boards.filter((part) => part.socket === cpu.socket) : boards;
   const boardPool = socketBoards.length ? socketBoards : boards;
-  const board = pickNearTarget(
-    boardPool.filter((part) => part.priceMkd <= remaining - 9000),
-    Math.round(partsBudget * weights.mb),
-    remaining - 9000,
-    (part) => {
-      let score = 0;
-      if (part.formFactor === "ATX") score += useCase === "office" ? 0.2 : 1;
-      if (part.formFactor === "mATX") score += 0.8;
-      if (/wi-?fi/i.test(part.name)) score += 0.4;
-      return score;
-    },
-  );
+  const affordableBoards = boardPool.filter((part) => part.priceMkd <= remaining - 9000);
+  const board = preferCheap
+    ? affordableBoards.slice().sort((a, b) => a.priceMkd - b.priceMkd)[0]
+    : pickNearTarget(
+        affordableBoards,
+        Math.round(partsBudget * weights.mb),
+        remaining - 9000,
+        (part) => {
+          let score = 0;
+          if (part.formFactor === "ATX") score += useCase === "office" ? 0.2 : 1;
+          if (part.formFactor === "mATX") score += 0.8;
+          if (/wi-?fi/i.test(part.name)) score += 0.4;
+          return score;
+        },
+      );
   if (!board) return null;
   sel.MOTHERBOARD = board;
   remaining -= board.priceMkd;
 
   const ramTarget =
     partsBudget > 110000 && useCase !== "office" ? Math.max(weights.ramGb, 32) : weights.ramGb;
+  const ramNeed = relaxed ? Math.min(16, ramTarget) : ramTarget;
   const rams = filterCompatibleParts(catalog, "RAM", sel).filter((part) => buyable(part));
   type RamOpt = { part: AiCatalogPart; qty: number; gb: number; cost: number };
   const ramOpts: RamOpt[] = [];
@@ -298,7 +321,15 @@ function completeBuild(
       if (gb > 0 && cost <= remaining - 7000) ramOpts.push({ part, qty, gb, cost });
     }
   }
-  ramOpts.sort((a, b) => ramScore(b, ramTarget, partsBudget * weights.ram) - ramScore(a, ramTarget, partsBudget * weights.ram));
+  ramOpts.sort((a, b) => {
+    if (preferCheap) {
+      const aOk = a.gb >= ramNeed ? 1 : 0;
+      const bOk = b.gb >= ramNeed ? 1 : 0;
+      if (aOk !== bOk) return bOk - aOk;
+      return a.cost - b.cost;
+    }
+    return ramScore(b, ramTarget, partsBudget * weights.ram) - ramScore(a, ramTarget, partsBudget * weights.ram);
+  });
   const ram = ramOpts[0];
   if (!ram) return null;
   sel.RAM = ram.part;
@@ -306,10 +337,19 @@ function completeBuild(
   remaining -= ram.cost;
 
   const ssdTarget = partsBudget > 100000 && useCase !== "office" ? Math.max(weights.ssdGb, 1000) : weights.ssdGb;
+  const diskNeed = relaxed ? Math.min(512, ssdTarget) : ssdTarget;
   const ssds = filterCompatibleParts(catalog, "SSD", sel).filter(
     (part) => buyable(part) && part.priceMkd <= remaining - 4500,
   );
-  const ssd = ssds.slice().sort((a, b) => ssdScore(b, ssdTarget, partsBudget) - ssdScore(a, ssdTarget, partsBudget))[0];
+  const ssd = ssds.slice().sort((a, b) => {
+    if (preferCheap) {
+      const aOk = storageGb(a.name) >= diskNeed ? 1 : 0;
+      const bOk = storageGb(b.name) >= diskNeed ? 1 : 0;
+      if (aOk !== bOk) return bOk - aOk;
+      return a.priceMkd - b.priceMkd;
+    }
+    return ssdScore(b, ssdTarget, partsBudget) - ssdScore(a, ssdTarget, partsBudget);
+  })[0];
   if (!ssd) return null;
   sel.SSD = [ssd];
   remaining -= ssd.priceMkd;
@@ -328,12 +368,14 @@ function completeBuild(
   const cases = filterCompatibleParts(catalog, "CASE", sel).filter(
     (part) => buyable(part) && part.priceMkd <= remaining,
   );
-  const pcCase = pickNearTarget(
-    cases,
-    Math.min(remaining, Math.max(2500, Math.round(partsBudget * weights.pcCase))),
-    remaining,
-    (part) => (part.formFactor ? 1 : 0),
-  );
+  const pcCase = preferCheap
+    ? cases.slice().sort((a, b) => a.priceMkd - b.priceMkd)[0]
+    : pickNearTarget(
+        cases,
+        Math.min(remaining, Math.max(2500, Math.round(partsBudget * weights.pcCase))),
+        remaining,
+        (part) => (part.formFactor ? 1 : 0),
+      );
   if (!pcCase) return null;
   sel.CASE = pcCase;
 
@@ -485,7 +527,9 @@ export function buildAiPc(
 
   const candidates: Filled[] = [];
   const consider = (cpu: AiCatalogPart, gpu: AiCatalogPart | null, relaxedQuality: boolean) => {
-    const filled = completeBuild(catalog, input.useCase, partsBudget, cpu, gpu);
+    const filled =
+      completeBuild(catalog, input.useCase, partsBudget, cpu, gpu, false, relaxedQuality) ??
+      completeBuild(catalog, input.useCase, partsBudget, cpu, gpu, true, relaxedQuality);
     if (filled && qualityOk(filled, input.useCase, relaxedQuality)) candidates.push(filled);
   };
 
@@ -532,6 +576,43 @@ export function buildAiPc(
 
   runPairs(false);
   if (!candidates.length) runPairs(true);
+  if (!candidates.length) {
+    if (weights.wantGpu) {
+      const gpuPicks = edgePicks(gpus, (gpu) => chipRel(gpu.name, "gpu"), Math.round(partsBudget * 0.55), 5);
+      const cpuPicks = edgePicks(cpus, (cpu) => chipRel(cpu.name, "cpu"), Math.round(partsBudget * 0.45), 6);
+      for (const relaxedQuality of [true, false]) {
+        for (const gpu of gpuPicks) {
+          for (const cpu of cpuPicks) {
+            if (priceOf(cpu) + priceOf(gpu) > partsBudget * 0.78) continue;
+            consider(cpu, gpu, relaxedQuality);
+          }
+        }
+      }
+      if (!candidates.length && (input.useCase === "work" || input.useCase === "content")) {
+        const igpu = edgePicks(
+          cpus.filter((cpu) => cpuHasIntegratedGraphics(cpu)),
+          (cpu) => chipRel(cpu.name, "cpu"),
+          Math.round(partsBudget * 0.45),
+          8,
+        );
+        for (const cpu of igpu) {
+          consider(cpu, null, true);
+          consider(cpu, null, false);
+        }
+      }
+    } else {
+      const cpuPicks = edgePicks(
+        cpus.filter((cpu) => cpuHasIntegratedGraphics(cpu)),
+        (cpu) => chipRel(cpu.name, "cpu"),
+        Math.round(partsBudget * 0.45),
+        8,
+      );
+      for (const cpu of cpuPicks) {
+        consider(cpu, null, true);
+        consider(cpu, null, false);
+      }
+    }
+  }
 
   if (!candidates.length) return null;
   candidates.sort((a, b) => fitness(b, input.useCase, partsBudget) - fitness(a, input.useCase, partsBudget));
@@ -566,4 +647,49 @@ export function buildAiPc(
     gpuName: gpu ? `${gpu.brand ?? ""} ${gpu.name}`.trim() : null,
     lines,
   };
+}
+
+/** Smallest whole budget (parts + assembly) that actually returns a build. */
+export function lowestAiBudget(
+  parts: AiCatalogPart[],
+  useCase: AiUseCase,
+  assemblyFeeMkd: number,
+): number {
+  const works = (budgetMkd: number) =>
+    buildAiPc(parts, { useCase, budgetMkd, assemblyFeeMkd }) != null;
+
+  let lo = AI_MIN_BUDGET_MKD;
+  let hi = 180000;
+  if (!works(hi)) return AI_MIN_BUDGET_MKD;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (works(mid)) hi = mid;
+    else lo = mid + 1;
+  }
+  let budget = Math.ceil(lo / 100) * 100;
+  for (let step = 0; step < 40 && !works(budget); step++) budget += 100;
+  return budget;
+}
+
+const minBudgetCache = globalThis as unknown as {
+  aiMinBudgets?: { key: string; mins: Record<AiUseCase, number> };
+};
+
+export function aiMinimumBudgets(
+  parts: AiCatalogPart[],
+  assemblyFeeMkd: number,
+): Record<AiUseCase, number> {
+  const key = `${assemblyFeeMkd}:${parts.length}:${parts.reduce(
+    (sum, part) => sum + part.priceMkd + (part.stock ?? 0),
+    0,
+  )}`;
+  const cached = minBudgetCache.aiMinBudgets;
+  if (cached?.key === key) return cached.mins;
+
+  const mins = {} as Record<AiUseCase, number>;
+  for (const useCase of AI_USE_CASES) {
+    mins[useCase] = lowestAiBudget(parts, useCase, assemblyFeeMkd);
+  }
+  minBudgetCache.aiMinBudgets = { key, mins };
+  return mins;
 }
