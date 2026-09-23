@@ -7,6 +7,7 @@ import {
   checkCompatibility,
   compatibilityFilterHint,
   createNonePart,
+  cpuHasIntegratedGraphics,
   cpuNeedsCooler,
   filterCompatibleParts,
   clampRamQty,
@@ -17,6 +18,7 @@ import {
   flattenSelection,
   getSsds,
   hasBlockingErrors,
+  hasRealPsu,
   isNonePart,
   isStepComplete,
   isStockCoolerPart,
@@ -33,6 +35,7 @@ import {
   ssdIsNone,
   ssdQtySlotLimit,
   stepHasNone,
+  withOptionalGpuSkipped,
   withOptionalSsdSkipped,
   type CompatPart,
   type CompatSelection,
@@ -45,6 +48,7 @@ import { useI18n } from "@/components/LanguageProvider";
 import { useCurrency } from "@/components/CurrencyProvider";
 import { PartFilters, type PartFilterState } from "@/components/PartFilters";
 import { ProductImage } from "@/components/ProductImage";
+import { inferListingGpuTdp } from "@/lib/listingPower";
 import { resolvePartImage } from "@/lib/partImages";
 import { fetchSessionUser, loginUrl } from "@/lib/clientAuth";
 import {
@@ -119,8 +123,21 @@ const DEFAULT_FILTERS: PartFilterState = {
   priceMax: 0,
 };
 
-const PAGE_SIZE = 6;
+const PHONE_PAGE_SIZE = 6;
+const PC_PAGE_SIZE = 9;
 const PAGE_BUTTONS = 6;
+
+function usePcPartsLayout() {
+  const [isPc, setIsPc] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const apply = () => setIsPc(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  return isPc;
+}
 
 function visiblePageNumbers(current: number, total: number, max = PAGE_BUTTONS): number[] {
   if (total <= max) return Array.from({ length: total }, (_, i) => i + 1);
@@ -234,6 +251,8 @@ export default function ConfiguratorPage() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [filters, setFilters] = useState<PartFilterState>(DEFAULT_FILTERS);
   const [page, setPage] = useState(1);
+  const isPcLayout = usePcPartsLayout();
+  const pageSize = isPcLayout ? PC_PAGE_SIZE : PHONE_PAGE_SIZE;
   const [ramQtyById, setRamQtyById] = useState<Record<string, number>>({});
   const [ssdQtyById, setSsdQtyById] = useState<Record<string, number>>({});
   const [slotWarning, setSlotWarning] = useState<string | null>(null);
@@ -313,7 +332,7 @@ export default function ConfiguratorPage() {
                 socket: null,
                 ramType: null,
                 wattage: null,
-                tdpWatts: null,
+                tdpWatts: l.category === "GPU" ? inferListingGpuTdp(l.name) : null,
                 formFactor: null,
                 source: "used" as const,
               }) satisfies Part,
@@ -437,12 +456,12 @@ export default function ConfiguratorPage() {
     return list;
   }, [compatibleOptions, filters, priceBounds.max, priceBounds.min]);
 
-  const totalPages = Math.max(1, Math.ceil(options.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(options.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const pagedOptions = useMemo(() => {
-    const start = (safePage - 1) * PAGE_SIZE;
-    return options.slice(start, start + PAGE_SIZE);
-  }, [options, safePage]);
+    const start = (safePage - 1) * pageSize;
+    return options.slice(start, start + pageSize);
+  }, [options, safePage, pageSize]);
 
   const filterHint = compatibilityFilterHint(selection, currentCat);
   const totalInCategory = parts.filter((p) => p.category === currentCat).length;
@@ -655,7 +674,7 @@ export default function ConfiguratorPage() {
   }
 
   async function beginBuy(sel: CompatSelection = selection) {
-    const ready = withOptionalSsdSkipped(sel);
+    const ready = withOptionalGpuSkipped(withOptionalSsdSkipped(sel));
     if (ready !== sel) setSelection(ready);
     if (!canBuySelection(ready)) return;
     if (!(await requireLoginForBuy(ready))) return;
@@ -671,8 +690,12 @@ export default function ConfiguratorPage() {
     return Boolean(cur && !Array.isArray(cur) && cur.id === part.id);
   }
 
-  /** Mark current step as skipped (None) if nothing was chosen yet. */
+  /** Mark the current step as skipped when Next is used with nothing chosen. */
   function ensureStepChoice(sel: CompatSelection): CompatSelection {
+    if (currentCat === "PSU") return sel;
+    if (currentCat === "GPU" && !sel.GPU) {
+      return { ...sel, GPU: createNonePart("GPU") };
+    }
     if (isStepComplete(sel, currentCat)) return sel;
     const none = createNonePart(currentCat);
     if (currentCat === "SSD") {
@@ -687,6 +710,7 @@ export default function ConfiguratorPage() {
   function removeCategory(cat: keyof CompatSelection) {
     window.clearTimeout(autoNextTimer.current);
     setSlotWarning(null);
+    if (cat === "PSU") setStep(BUILDER_STEPS.indexOf("PSU"));
     setSelection((s) => {
       const next: CompatSelection =
         cat === "SSD" ? { ...s, SSD: null } : { ...s, [cat]: null };
@@ -704,31 +728,52 @@ export default function ConfiguratorPage() {
     setRamQtyById({});
     setSsdQtyById({});
     setSlotWarning(null);
+    setCondition("new");
     setStep(0);
     clearBuilderDraft();
   }
 
+  function conditionForStep(index: number, current: "new" | "used"): "new" | "used" {
+    if (current !== "used") return "new";
+    const cat = BUILDER_STEPS[index];
+    return usedParts.some((p) => p.category === cat) ? "used" : "new";
+  }
+
   function goPrev() {
     window.clearTimeout(autoNextTimer.current);
-    if (step > 0) setStep(step - 1);
+    if (step > 0) {
+      const next = step - 1;
+      setCondition((c) => conditionForStep(next, c));
+      setStep(next);
+    }
   }
 
   function goNext() {
     window.clearTimeout(autoNextTimer.current);
+    if (currentCat === "PSU" && !hasRealPsu(selection)) return;
     setSelection((s) => ensureStepChoice(s));
-    if (step < BUILDER_STEPS.length - 1) setStep(step + 1);
+    if (step < BUILDER_STEPS.length - 1) {
+      const next = step + 1;
+      setCondition((c) => conditionForStep(next, c));
+      setStep(next);
+    }
   }
 
   function jumpToStep(i: number) {
     window.clearTimeout(autoNextTimer.current);
-    setStep(i);
+    const psuIndex = BUILDER_STEPS.indexOf("PSU");
+    const target = i > psuIndex && step <= psuIndex && !hasRealPsu(selection) ? psuIndex : i;
+    setCondition((c) => conditionForStep(target, c));
+    setStep(target);
   }
 
   function goNextAfterPick() {
     if (step >= BUILDER_STEPS.length - 1) return;
     window.clearTimeout(autoNextTimer.current);
+    const next = step + 1;
     autoNextTimer.current = window.setTimeout(() => {
-      setStep((s) => Math.min(s + 1, BUILDER_STEPS.length - 1));
+      setCondition((c) => conditionForStep(next, c));
+      setStep(next);
     }, 280);
   }
 
@@ -737,8 +782,14 @@ export default function ConfiguratorPage() {
       goNext();
       return;
     }
-    const nextSel = withOptionalSsdSkipped(ensureStepChoice(selection));
+    const nextSel = withOptionalGpuSkipped(withOptionalSsdSkipped(ensureStepChoice(selection)));
     setSelection(nextSel);
+    const phone = window.matchMedia("(max-width: 1023px)").matches;
+    if (phone) {
+      if (!canBuySelection(nextSel)) return;
+      setPricingOpen(true);
+      return;
+    }
     void beginBuy(nextSel);
   }
 
@@ -850,9 +901,19 @@ export default function ConfiguratorPage() {
     selection.GPU && !isNonePart(selection.GPU) ? (selection.GPU as Part) : null;
   const selectedCpu =
     selection.CPU && !isNonePart(selection.CPU) ? (selection.CPU as Part) : null;
+  const needsToRun = (
+    [
+      !selectedRam ? "ram" : null,
+      selectedGpu || cpuHasIntegratedGraphics(selectedCpu) ? null : "gpu",
+      !selectedSsd ? "ssd" : null,
+    ] as const
+  ).filter((item): item is "ram" | "gpu" | "ssd" => item !== null);
   const isFirstStep = step <= 0;
   const isLastStep = step >= BUILDER_STEPS.length - 1;
   const canClear = selectionHasChoice(selection);
+  const psuBlocksNext = currentCat === "PSU" && !hasRealPsu(selection);
+  const nextDisabled =
+    psuBlocksNext || (isLastStep && !canBuySelection(ensureStepChoice(selection)));
 
   async function submitOrder(data: {
     customerName: string;
@@ -910,31 +971,6 @@ export default function ConfiguratorPage() {
         <p className="mt-2 text-[var(--text-muted)]">{t("builder.desc")}</p>
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        {(
-          [
-            ["new", t("builder.conditionNew")],
-            ["used", t("builder.conditionUsed")],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setCondition(id)}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-              condition === id
-                ? "bg-[var(--cyan)] text-[#041018]"
-                : "bg-[rgba(34,211,238,0.06)] text-[var(--text-muted)] hover:text-[var(--text)]"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      {condition === "used" && (
-        <p className="mb-4 text-sm text-[var(--text-muted)]">{t("builder.usedHint")}</p>
-      )}
-
       <div className="mb-6 hidden flex-wrap gap-2 lg:flex">
         {BUILDER_STEPS.map((cat, i) => {
           const filled = stepHasSelection(selection, cat as keyof CompatSelection);
@@ -978,16 +1014,8 @@ export default function ConfiguratorPage() {
               <div className="flex shrink-0 items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={clearAll}
-                  disabled={!canClear}
-                  className="rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs font-semibold text-[var(--danger)] transition enabled:hover:border-[var(--danger)] enabled:hover:bg-[rgba(251,113,133,0.1)] disabled:cursor-not-allowed disabled:opacity-35"
-                >
-                  {t("builder.clearAll")}
-                </button>
-                <button
-                  type="button"
                   onClick={() => setPricingOpen(false)}
-                  className="btn btn-ghost !px-3 !py-1.5 !text-sm lg:hidden"
+                  className="rounded-lg px-2.5 py-1.5 text-sm text-[var(--text-muted)] lg:hidden"
                   aria-label={t("prebuilts.close")}
                 >
                   ✕
@@ -1167,6 +1195,22 @@ export default function ConfiguratorPage() {
                 ))}
               </ul>
             )}
+            {((Boolean(selection.GPU && isNonePart(selection.GPU)) &&
+              !cpuHasIntegratedGraphics(selectedCpu)) ||
+              ssdIsNone(selection) ||
+              (!selectedSsd && step >= BUILDER_STEPS.indexOf("SSD"))) && (
+              <ul className="mt-2 space-y-2 text-sm text-[var(--warn)]">
+                {selection.GPU &&
+                isNonePart(selection.GPU) &&
+                !cpuHasIntegratedGraphics(selectedCpu) ? (
+                  <li>{t("builder.bringOwnGpu")}</li>
+                ) : null}
+                {ssdIsNone(selection) ||
+                (!selectedSsd && step >= BUILDER_STEPS.indexOf("SSD")) ? (
+                  <li>{t("builder.bringOwnSsd")}</li>
+                ) : null}
+              </ul>
+            )}
             {slotWarning && (
               <p className="mt-2 text-sm font-medium text-[var(--warn)]">{slotWarning}</p>
             )}
@@ -1192,9 +1236,6 @@ export default function ConfiguratorPage() {
               </h2>
               <p className="mt-0.5 text-xs text-[var(--text-muted)]">
                 {t("builder.stepOf", { step: step + 1, total: BUILDER_STEPS.length })}
-                {!isStepComplete(selection, currentCat)
-                  ? ` · ${t("builder.nextSkips")}`
-                  : ""}
               </p>
             </div>
             <div className="hidden shrink-0 items-center gap-2 lg:flex">
@@ -1217,7 +1258,7 @@ export default function ConfiguratorPage() {
               <button
                 type="button"
                 onClick={goNextOrBuy}
-                disabled={isLastStep && !canBuySelection(ensureStepChoice(selection))}
+                disabled={nextDisabled}
                 className="rounded-lg bg-[var(--cyan)] px-3.5 py-2 text-sm font-medium text-[#041018] transition enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35"
               >
                 {isLastStep ? t("builder.order") : t("builder.next")}
@@ -1234,59 +1275,57 @@ export default function ConfiguratorPage() {
           {currentCat === "COOLER" && selection.CPU && cpuNeedsCooler(selection.CPU) && (
             <p className="mt-2 text-xs text-[var(--warn)]">{t("builder.coolerRequiredHint")}</p>
           )}
+          {psuBlocksNext && (
+            <p className="mt-2 text-xs text-[var(--warn)]">{t("builder.psuRequired")}</p>
+          )}
+          {!hasRealPsu(selection) && step > BUILDER_STEPS.indexOf("PSU") && (
+            <p className="mt-2 text-xs text-[var(--warn)]">{t("builder.psuRequired")}</p>
+          )}
           {currentCat === "COOLER" && selection.CPU && !cpuNeedsCooler(selection.CPU) && (
             <p className="mt-2 text-xs text-[var(--mint)]">{t("builder.coolerIncludedHint")}</p>
           )}
-          {currentCat === "SSD" && (
-            <>
-              <p className="mt-2 text-xs text-[var(--mint)]">{t("builder.skipSsdHint")}</p>
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
-                {ssdSlotCount
-                  ? t("builder.ssdQtyHintSlots", { count: ssdSlotCount })
-                  : t("builder.ssdQtyHint")}
-              </p>
-            </>
-          )}
-          {currentCat === "RAM" && (
-            <>
-              <p className="mt-2 text-xs text-[var(--text-muted)]">
-                {ramSlotCount
-                  ? t("builder.ramQtyHintSlots", { count: ramSlotCount })
-                  : t("builder.ramQtyHint")}
-              </p>
-              <p className="mt-1 text-[11px] text-[var(--text-muted)]">{t("builder.ramKitHint")}</p>
-            </>
-          )}
+          {currentCat === "SSD" && ssdSlotCount ? (
+            <p className="mt-2 text-xs text-[var(--text-muted)]">
+              {t("builder.ssdQtyHintSlots", { count: ssdSlotCount })}
+            </p>
+          ) : null}
+          {currentCat === "RAM" && ramSlotCount ? (
+            <p className="mt-2 text-xs text-[var(--text-muted)]">
+              {t("builder.ramQtyHintSlots", { count: ramSlotCount })}
+            </p>
+          ) : null}
           {slotWarning && (
             <p className="mt-2 text-xs font-medium text-[var(--warn)]">{slotWarning}</p>
           )}
           <p className="mt-1 text-[11px] text-[var(--text-muted)]">{t("builder.clickToDeselect")}</p>
+          <div className="mt-2.5 flex justify-center">
+            <div className="inline-flex rounded-full border border-[var(--border)] bg-[rgba(7,11,18,0.55)] p-0.5">
+              {(
+                [
+                  ["new", t("builder.conditionNew")],
+                  ["used", t("builder.conditionUsed")],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setCondition(id)}
+                  className={`min-w-[7.25rem] rounded-full px-5 py-1.5 text-xs font-semibold tracking-wide transition ${
+                    condition === id
+                      ? "bg-[var(--cyan)] text-[#041018] shadow-[0_0_16px_rgba(34,211,238,0.28)]"
+                      : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {condition === "used" && (
+            <p className="mt-2 text-sm text-[var(--text-muted)]">{t("builder.usedHint")}</p>
+          )}
 
-          <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-            {currentCat === "SSD" && (
-              <div
-                role="button"
-                tabIndex={0}
-                aria-pressed={!selectedSsd}
-                onClick={() =>
-                  setSelection((s) => ({ ...s, SSD: [createNonePart("SSD")] }))
-                }
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setSelection((s) => ({ ...s, SSD: [createNonePart("SSD")] }));
-                  }
-                }}
-                className={`flex min-h-[9.5rem] cursor-pointer flex-col items-center justify-center rounded-lg border p-3 text-center transition ${
-                  !selectedSsd
-                    ? "border-[var(--cyan)] bg-[rgba(34,211,238,0.1)]"
-                    : "border-[var(--border)] bg-[rgba(7,11,18,0.4)] hover:border-[var(--border-strong)]"
-                }`}
-              >
-                <p className="text-sm font-semibold text-[var(--cyan)]">{t("builder.skipSsd")}</p>
-                <p className="mt-1 text-[11px] text-[var(--text-muted)]">{t("builder.none")}</p>
-              </div>
-            )}
+          <div className="mt-3 grid grid-cols-2 gap-2.5 lg:grid-cols-3">
             {pagedOptions.map((part) => {
               const active = isPartActive(part);
               const img = resolvePartImage(part);
@@ -1413,7 +1452,7 @@ export default function ConfiguratorPage() {
             )}
           </div>
 
-          {options.length > PAGE_SIZE && (
+          {options.length > pageSize && (
             <div className="mt-5 flex flex-nowrap items-center justify-center gap-1">
               <button
                 type="button"
@@ -1524,7 +1563,7 @@ export default function ConfiguratorPage() {
               <button
                 type="button"
                 onClick={goNextOrBuy}
-                disabled={isLastStep && !canBuySelection(ensureStepChoice(selection))}
+                disabled={nextDisabled}
                 className="min-h-11 flex-1 rounded-xl bg-[var(--cyan)] px-3 text-sm font-semibold text-[#041018] transition enabled:active:scale-[0.98] enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35"
               >
                 {isLastStep ? t("builder.order") : t("builder.next")}
@@ -1595,6 +1634,7 @@ export default function ConfiguratorPage() {
         onClose={() => setCheckoutOpen(false)}
         title={t("builder.checkoutTitle")}
         totalMkd={total}
+        needsToRun={needsToRun}
         onSubmit={submitOrder}
       />
     </div>

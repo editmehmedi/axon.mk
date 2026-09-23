@@ -531,7 +531,6 @@ export default function AdminPage() {
                       <ul className="space-y-2">
                         {buyList.map((line, idx) => {
                           const key = `${o.id}-${idx}`;
-                          const search = storeSearchUrl(line.store, line.label);
                           return (
                             <li
                               key={key}
@@ -559,9 +558,9 @@ export default function AdminPage() {
                                 <span className="rounded-full bg-[rgba(34,211,238,0.12)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--cyan)]">
                                   {line.store.name}
                                 </span>
-                                {search ? (
+                                {line.store.homepage ? (
                                   <a
-                                    href={search}
+                                    href={`/api/admin/store-link?store=${encodeURIComponent(line.store.id)}&category=${encodeURIComponent(line.category)}&q=${encodeURIComponent(line.label)}`}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="text-xs text-[var(--cyan)] hover:underline"

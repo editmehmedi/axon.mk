@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { PrismaClient, Role, OrderStatus } from "../src/generated/prisma";
 import bcrypt from "bcryptjs";
 import { exactPartImagePath } from "../src/lib/exactParts";
+import { buildPrebuiltLineup } from "../src/lib/prebuiltFromParts";
 import { loadAllAnhochParts } from "./anhochInventory";
 
 const prisma = new PrismaClient();
@@ -97,15 +98,19 @@ async function main() {
     `Seeding ${parts.length} parts (CPU/GPU/RAM merged cheapest across Anhoch+Setec+Gjirafa+Neptun)`,
   );
 
-  for (const part of parts) {
+  const catalogParts = parts.map((part) => {
     const { source: _source, ...rest } = part;
-    await prisma.part.create({
-      data: {
-        ...rest,
-        imageUrl: rest.imageUrl || exactPartImagePath(rest.brand, rest.name),
-      },
-    });
+    return {
+      ...rest,
+      imageUrl: rest.imageUrl || exactPartImagePath(rest.brand, rest.name),
+    };
+  });
+
+  for (const part of catalogParts) {
+    await prisma.part.create({ data: part });
   }
+
+  const lineup = buildPrebuiltLineup(catalogParts, prebuilts.length);
 
   // 20 ready-to-ship builds, cheapest → most expensive (MKD)
   const prebuilts = [
@@ -451,12 +456,27 @@ async function main() {
     },
   ];
 
-  for (const pc of prebuilts) {
+  for (let i = 0; i < prebuilts.length; i++) {
+    const pc = prebuilts[i];
+    const built = lineup[i];
     await prisma.prebuilt.create({
       data: {
-        ...pc,
-        imageUrl: pc.imageUrl,
+        slug: pc.slug,
+        name: pc.name,
+        description: pc.description,
+        stock: pc.stock,
+        deliveryHours: pc.deliveryHours,
         condition: "new",
+        cpuLabel: built?.cpuLabel ?? pc.cpuLabel,
+        coolerLabel: built?.coolerLabel ?? pc.coolerLabel,
+        motherboardLabel: built?.motherboardLabel ?? pc.motherboardLabel,
+        ramLabel: built?.ramLabel ?? pc.ramLabel,
+        gpuLabel: built?.gpuLabel ?? pc.gpuLabel,
+        ssdLabel: built?.ssdLabel ?? pc.ssdLabel,
+        psuLabel: built?.psuLabel ?? pc.psuLabel,
+        caseLabel: built?.caseLabel ?? pc.caseLabel,
+        priceMkd: built?.priceMkd ?? pc.priceMkd,
+        imageUrl: built?.imageUrl || pc.imageUrl,
       },
     });
   }

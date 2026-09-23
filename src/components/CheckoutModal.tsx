@@ -11,6 +11,7 @@ type Props = {
   onClose: () => void;
   title: string;
   totalMkd: number;
+  needsToRun?: Array<"ram" | "gpu" | "ssd">;
   onSubmit: (data: {
     customerName: string;
     customerPhone: string;
@@ -20,7 +21,7 @@ type Props = {
   }) => Promise<void>;
 };
 
-export function CheckoutModal({ open, onClose, title, totalMkd, onSubmit }: Props) {
+export function CheckoutModal({ open, onClose, title, totalMkd, needsToRun = [], onSubmit }: Props) {
   const { t } = useI18n();
   const { currency, formatPrice } = useCurrency();
   const [loading, setLoading] = useState(false);
@@ -80,18 +81,19 @@ export function CheckoutModal({ open, onClose, title, totalMkd, onSubmit }: Prop
         <form onSubmit={handleSubmit} className="space-y-3">
           {(
             [
-              ["customerName", t("checkout.name"), "text"],
-              ["customerPhone", t("checkout.phone"), "tel"],
-              ["customerEmail", t("checkout.email"), "email"],
-              ["customerAddress", t("checkout.address"), "text"],
-              ["city", t("checkout.city"), "text"],
+              ["customerName", t("checkout.name"), "text", 2],
+              ["customerPhone", t("checkout.phone"), "tel", 6],
+              ["customerEmail", t("checkout.email"), "email", undefined],
+              ["customerAddress", t("checkout.address"), "text", 3],
+              ["city", t("checkout.city"), "text", 2],
             ] as const
-          ).map(([key, label, type]) => (
+          ).map(([key, label, type, minLength]) => (
             <div key={key}>
               <label className="label">{label}</label>
               <input
                 required
                 type={type}
+                minLength={minLength}
                 className="input"
                 value={form[key]}
                 onChange={(e) => setForm({ ...form, [key]: e.target.value })}
@@ -111,6 +113,13 @@ export function CheckoutModal({ open, onClose, title, totalMkd, onSubmit }: Prop
             )}
             <p className="mt-2 text-xs text-[var(--text-muted)]">{t("checkout.verifyNote")}</p>
             <p className="mt-1 text-xs text-[var(--mint)]">{t("checkout.emailNote")}</p>
+            {needsToRun.length > 0 && (
+              <ul className="mt-3 space-y-1 border-t border-[var(--border)] pt-3 text-sm text-[var(--warn)]">
+                {needsToRun.includes("ram") ? <li>{t("checkout.needsRam")}</li> : null}
+                {needsToRun.includes("gpu") ? <li>{t("checkout.needsGpu")}</li> : null}
+                {needsToRun.includes("ssd") ? <li>{t("checkout.needsSsd")}</li> : null}
+              </ul>
+            )}
           </div>
 
           {error && <p className="text-sm text-[var(--danger)]">{error}</p>}

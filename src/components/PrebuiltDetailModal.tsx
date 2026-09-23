@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { resolvePrebuiltImage } from "@/lib/partImages";
 import { getPrebuiltSpecs } from "@/lib/prebuiltSpecs";
 import { ProductImage } from "./ProductImage";
@@ -17,6 +18,34 @@ type Props = {
 export function PrebuiltDetailModal({ pc, open, onClose, onBuy }: Props) {
   const { t } = useI18n();
   const { formatPrice } = useCurrency();
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+
+    const overlay = overlayRef.current;
+    function onWheel(event: WheelEvent) {
+      event.preventDefault();
+      const scroller = scrollRef.current;
+      if (!scroller) return;
+      scroller.scrollTop += event.deltaY;
+    }
+    overlay?.addEventListener("wheel", onWheel, { passive: false });
+
+    return () => {
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
+      overlay?.removeEventListener("wheel", onWheel);
+    };
+  }, [open]);
+
   if (!open || !pc) return null;
 
   const inStock = pc.stock > 0;
@@ -25,16 +54,18 @@ export function PrebuiltDetailModal({ pc, open, onClose, onBuy }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/65 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+      ref={overlayRef}
+      className="fixed inset-0 z-[80] flex items-end justify-center overscroll-none bg-black/65 p-0 backdrop-blur-sm sm:items-center sm:p-4"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="prebuilt-detail-title"
     >
       <div
-        className="glass flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl"
+        className="glass flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden overscroll-contain rounded-t-2xl sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <div className="relative shrink-0 p-4 pb-0">
           <ProductImage src={img} alt={pc.name} ratio="wide" />
           <div className="absolute left-6 top-6 z-10 flex flex-wrap gap-1.5">
@@ -61,7 +92,7 @@ export function PrebuiltDetailModal({ pc, open, onClose, onBuy }: Props) {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6">
+        <div className="p-5 sm:p-6">
           <h2
             id="prebuilt-detail-title"
             className="section-title text-2xl text-[var(--text)]"
@@ -93,6 +124,7 @@ export function PrebuiltDetailModal({ pc, open, onClose, onBuy }: Props) {
               </div>
             ))}
           </dl>
+        </div>
         </div>
 
         <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--border)] p-4 sm:p-5">

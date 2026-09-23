@@ -25,6 +25,7 @@ export function Navbar() {
     { href: "/used", label: t("nav.used") },
     { href: "/used-parts", label: t("nav.usedParts") },
     { href: "/configurator", label: t("nav.configurator") },
+    { href: "/ai-build", label: t("nav.ai") },
     { href: "/sell", label: t("nav.sell") },
     { href: "/orders", label: t("nav.orders") },
   ];
@@ -105,11 +106,21 @@ export function Navbar() {
             </span>
           </Link>
 
-          <div className="ml-auto flex items-center">
-            <div className="mr-3 hidden items-center gap-1.5 md:flex">
+          <div className="ml-auto flex items-center gap-1.5">
+            <div className="mr-1.5 hidden items-center gap-1.5 md:flex">
               <CurrencySwitcher />
               <LanguageSwitcher />
             </div>
+            <Link
+              href="/orders"
+              className={`mr-1.5 inline-flex items-center justify-center whitespace-nowrap rounded-[0.65rem] border px-3.5 py-2 text-xs font-semibold md:hidden ${
+                pathname.startsWith("/orders")
+                  ? "border-[rgba(34,211,238,0.45)] bg-[rgba(34,211,238,0.14)] text-[var(--cyan)]"
+                  : "border-[var(--border)] bg-[rgba(34,211,238,0.06)] text-[var(--text)]"
+              }`}
+            >
+              {t("nav.orders")}
+            </Link>
             {user ? (
               <button
                 onClick={logout}

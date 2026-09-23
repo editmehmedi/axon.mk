@@ -67,6 +67,38 @@ export function cpuNeedsCooler(cpu: CompatPart | null | undefined): boolean {
   return !cpu.includesCooler;
 }
 
+/**
+ * Desktop CPUs that can display a picture without a graphics card.
+ * Intel F/KF and AMD F have none. Ryzen 7000/9000 (non-F) and G/GT APUs do.
+ */
+export function cpuHasIntegratedGraphics(
+  cpu: { brand?: string | null; name?: string | null } | null | undefined,
+): boolean {
+  if (!cpu?.name) return false;
+  const text = `${cpu.brand ?? ""} ${cpu.name}`
+    .toLowerCase()
+    .replace(/\(.*?\)/g, " ");
+  if (/threadripper/.test(text)) return false;
+
+  const isAmd = /amd|ryzen|athlon|\ba[468]-?\s*series/.test(text);
+  if (!isAmd && /intel|core|celeron|pentium|\bultra\b/.test(text)) {
+    if (/(?:i[3579][-\s]?\d{4,5}|ultra\s*[579]\s*\d{3,5})(?:kf|f)\b/.test(text)) {
+      return false;
+    }
+    return true;
+  }
+
+  if (isAmd) {
+    if (/\b\d{3,4}g(?:e|t)?\b/.test(text)) return true;
+    if (/\ba[468](?:-?\s*series)?\b/.test(text)) return true;
+    if (/\b\d{4}f\b/.test(text)) return false;
+    if (/\b[7-9]\d{3}(?:x3d\d?|x|xt)?\b/.test(text)) return true;
+    return false;
+  }
+
+  return false;
+}
+
 export type CompatSelection = {
   CPU?: CompatPart | null;
   COOLER?: CompatPart | null;
@@ -292,11 +324,16 @@ export function selectionPriceMkd(sel: CompatSelection, ramQty = 1, ssdQty = 1):
   }, 0);
 }
 
+export function hasRealPsu(sel: CompatSelection): boolean {
+  return Boolean(sel.PSU && !isNonePart(sel.PSU));
+}
+
 export function isStepComplete(sel: CompatSelection, category: keyof CompatSelection): boolean {
-  if (category === "SSD") {
-    // Storage is optional: no pick (or an explicit skip) still completes the build.
+  if (category === "SSD" || category === "GPU") {
+    // Storage and graphics are optional: no pick (or an explicit skip) still completes the build.
     return true;
   }
+  if (category === "PSU") return hasRealPsu(sel);
   const v = sel[category];
   if (!v || Array.isArray(v)) return false;
   return true; // real part or None sentinel
@@ -306,6 +343,12 @@ export function isStepComplete(sel: CompatSelection, category: keyof CompatSelec
 export function withOptionalSsdSkipped(sel: CompatSelection): CompatSelection {
   if (getSsds(sel).length > 0 || ssdIsNone(sel)) return sel;
   return { ...sel, SSD: [createNonePart("SSD")] };
+}
+
+/** Empty GPU step → explicit skip so checkout/pricing treat it as no graphics card. */
+export function withOptionalGpuSkipped(sel: CompatSelection): CompatSelection {
+  if (sel.GPU) return sel;
+  return { ...sel, GPU: createNonePart("GPU") };
 }
 
 export function stepHasNone(sel: CompatSelection, category: keyof CompatSelection): boolean {
@@ -579,8 +622,9 @@ export function compatibilityFilterHint(sel: CompatSelection, category: string):
   if (category === "CASE" && mb?.formFactor) {
     return mb.formFactor;
   }
-  if (category === "PSU" && (cpu || gpu)) {
-    return `≥${estimatedPsuWatts(sel)}W`;
+  if (category === "PSU") {
+    if (cpu || gpu) return `≥${estimatedPsuWatts(sel)}W`;
+    return null;
   }
   if (category === "CPU" && mb?.socket) {
     return `socket ${mb.socket}`;

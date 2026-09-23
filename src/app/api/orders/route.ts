@@ -24,12 +24,31 @@ function isCatalogPartId(id: string) {
 }
 
 const customerSchema = z.object({
-  customerName: z.string().min(2),
-  customerPhone: z.string().min(6),
-  customerEmail: z.string().email(),
-  customerAddress: z.string().min(3),
-  city: z.string().min(2),
+  customerName: z.string().trim().min(2),
+  customerPhone: z.string().trim().min(6),
+  customerEmail: z.string().trim().email(),
+  customerAddress: z.string().trim().min(3),
+  city: z.string().trim().min(2),
 });
+
+function isZodError(e: unknown): e is z.ZodError {
+  return Boolean(e && typeof e === "object" && (e as { name?: string }).name === "ZodError");
+}
+
+function friendlyOrderError(error: z.ZodError): string {
+  const labels: Record<string, string> = {
+    customerName: "Name must be at least 2 characters",
+    customerPhone: "Phone must be at least 6 characters",
+    customerEmail: "Enter a valid email",
+    customerAddress: "Address must be at least 3 characters",
+    city: "City must be at least 2 characters",
+  };
+  const lines = error.issues.map((issue) => {
+    const key = String(issue.path[0] ?? "");
+    return labels[key] ?? "Check the order details and try again";
+  });
+  return [...new Set(lines)].join(". ");
+}
 
 const prebuiltOrderSchema = customerSchema.extend({
   type: z.literal("PREBUILT"),
@@ -310,6 +329,9 @@ export async function POST(req: Request) {
       if (hasBlockingErrors(issues)) {
         return NextResponse.json({ error: "Некомпатибилна конфигурација", issues }, { status: 400 });
       }
+      if (!single("PSU")) {
+        return NextResponse.json({ error: "A power supply is required" }, { status: 400 });
+      }
 
       const settings = await prisma.siteSettings.findUnique({ where: { id: 1 } });
       const fee = settings?.assemblyFeeMkd ?? 2999;
@@ -420,6 +442,9 @@ export async function POST(req: Request) {
         { error: "Session expired — sign out and sign in again" },
         { status: 401 },
       );
+    }
+    if (isZodError(e)) {
+      return NextResponse.json({ error: friendlyOrderError(e) }, { status: 400 });
     }
     const message = e instanceof Error ? e.message : "Error";
     return NextResponse.json({ error: message }, { status: 400 });

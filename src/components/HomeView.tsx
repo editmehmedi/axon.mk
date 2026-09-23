@@ -15,7 +15,7 @@ export function HomeView({ prebuilts }: { prebuilts: PrebuiltCardData[] }) {
     <div>
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 grid-noise opacity-40" />
-        <div className="relative mx-auto max-w-3xl px-4 py-14 text-center md:px-6 md:py-20">
+        <div className="relative mx-auto max-w-5xl px-4 py-14 text-center md:px-6 md:py-20">
           <p className="text-sm uppercase tracking-[0.28em] text-[var(--cyan-dim)]">
             {t("home.eyebrow")}
           </p>
@@ -51,7 +51,21 @@ export function HomeView({ prebuilts }: { prebuilts: PrebuiltCardData[] }) {
               </button>
             </div>
           ) : (
-            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+              <Link
+                href="/ai-build"
+                className="glass-strong rounded-2xl p-5 text-left transition hover:border-[var(--cyan)]"
+              >
+                <p className="section-title text-xl text-[var(--cyan)]">{t("home.aiTitle")}</p>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">{t("home.aiHint")}</p>
+              </Link>
+              <Link
+                href="/configurator"
+                className="glass rounded-2xl p-5 text-left transition hover:border-[var(--border-strong)]"
+              >
+                <p className="section-title text-xl text-[var(--text)]">{t("home.buildTitle")}</p>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">{t("home.buildHint")}</p>
+              </Link>
               <button
                 type="button"
                 onClick={() => setBuying(true)}
@@ -60,13 +74,6 @@ export function HomeView({ prebuilts }: { prebuilts: PrebuiltCardData[] }) {
                 <p className="section-title text-xl text-[var(--text)]">{t("home.buyTitle")}</p>
                 <p className="mt-1 text-sm text-[var(--text-muted)]">{t("home.buyHint")}</p>
               </button>
-              <Link
-                href="/configurator"
-                className="glass-strong rounded-2xl p-5 text-left transition hover:border-[var(--cyan)]"
-              >
-                <p className="section-title text-xl text-[var(--cyan)]">{t("home.buildTitle")}</p>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">{t("home.buildHint")}</p>
-              </Link>
             </div>
           )}
         </div>
