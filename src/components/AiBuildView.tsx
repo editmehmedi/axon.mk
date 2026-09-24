@@ -287,17 +287,34 @@ export function AiBuildView({ minimums }: { minimums: Record<AiUseCase, number> 
 
           {error && <p className="mt-4 text-sm text-[var(--danger)]">{error}</p>}
 
-          <button type="submit" className="btn btn-primary mt-5 w-full" disabled={loading}>
+          <button
+            type="submit"
+            className={`btn btn-primary mt-5 w-full ${loading ? "is-loading" : ""}`}
+            disabled={loading}
+            aria-busy={loading}
+          >
+            {loading && <span className="ai-spinner" aria-hidden />}
             {loading ? t("ai.building") : t("ai.build")}
           </button>
         </form>
 
         <div className="min-w-0 space-y-4">
-          {!build && (
+          {loading && (
+            <div
+              className="glass flex flex-col items-center justify-center gap-4 rounded-2xl px-6 py-16 text-center"
+              role="status"
+              aria-live="polite"
+            >
+              <span className="ai-spinner ai-spinner-lg" aria-hidden />
+              <p className="text-sm text-[var(--text-muted)]">{t("ai.building")}</p>
+            </div>
+          )}
+
+          {!build && !loading && (
             <div className="glass rounded-2xl p-6 text-sm text-[var(--text-muted)]">{t("ai.empty")}</div>
           )}
 
-          {build && (
+          {build && !loading && (
             <>
               <div ref={resultRef} className="glass-strong scroll-mt-20 overflow-hidden rounded-2xl p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
