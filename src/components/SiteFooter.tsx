@@ -15,7 +15,7 @@ export function SiteFooter({
 }) {
   const { t } = useI18n();
   const pathname = usePathname();
-  const builderPad = pathname.startsWith("/configurator") || pathname.startsWith("/ai-build");
+  const builderPad = pathname.startsWith("/configurator");
   return (
     <footer
       className={`border-t border-[var(--border)] py-8 text-center text-sm text-[var(--text-muted)] ${

@@ -66,6 +66,8 @@ export function AiBuildView({ minimums }: { minimums: Record<AiUseCase, number> 
   const [error, setError] = useState("");
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const budgetCurrency = useRef<CurrencyCode | null>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
+  const scrollToResult = useRef(false);
 
   useEffect(() => {
     if (budgetCurrency.current === currency) return;
@@ -88,6 +90,12 @@ export function AiBuildView({ minimums }: { minimums: Record<AiUseCase, number> 
       /* ignore stored draft */
     }
   }, []);
+
+  useEffect(() => {
+    if (!build || !scrollToResult.current) return;
+    scrollToResult.current = false;
+    resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [build]);
 
   function budgetMkd(): number {
     const amount = Number(budgetText.replace(/[^\d.]/g, ""));
@@ -122,6 +130,7 @@ export function AiBuildView({ minimums }: { minimums: Record<AiUseCase, number> 
       }
       setBuild(json.build as AiBuild);
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(json.build));
+      scrollToResult.current = true;
     } catch {
       setError(t("ai.error.generic"));
     } finally {
@@ -205,15 +214,15 @@ export function AiBuildView({ minimums }: { minimums: Record<AiUseCase, number> 
     (build?.useCase === "gaming" || build?.useCase === "streaming" || build?.useCase === "content");
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 pb-40 md:px-6 lg:pb-10">
+    <div className="mx-auto w-full min-w-0 max-w-6xl px-4 py-10 md:px-6">
       <div className="mb-8 max-w-2xl">
         <h1 className="section-title text-3xl md:text-4xl">{t("ai.title")}</h1>
         <p className="mt-2 text-[var(--text-muted)]">{t("ai.desc")}</p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+      <div className="grid w-full min-w-0 gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
         <form
-          className="glass-strong h-fit rounded-2xl p-5"
+          className="glass-strong h-fit min-w-0 overflow-hidden rounded-2xl p-5"
           onSubmit={(e) => {
             e.preventDefault();
             void buildPc();
@@ -283,14 +292,14 @@ export function AiBuildView({ minimums }: { minimums: Record<AiUseCase, number> 
           </button>
         </form>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           {!build && (
             <div className="glass rounded-2xl p-6 text-sm text-[var(--text-muted)]">{t("ai.empty")}</div>
           )}
 
           {build && (
             <>
-              <div className="glass-strong rounded-2xl p-5">
+              <div ref={resultRef} className="glass-strong scroll-mt-20 overflow-hidden rounded-2xl p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h2 className="section-title text-2xl">{t("ai.specs")}</h2>
@@ -386,20 +395,6 @@ export function AiBuildView({ minimums }: { minimums: Record<AiUseCase, number> 
           )}
         </div>
       </div>
-
-      {build && (
-        <div className="fixed inset-x-0 bottom-0 z-[60] border-t border-[var(--border)] bg-[rgba(7,11,18,0.94)] p-3 backdrop-blur-xl lg:hidden">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
-            <div>
-              <p className="text-xs text-[var(--text-muted)]">{t("ai.total")}</p>
-              <p className="font-semibold text-[var(--cyan)]">{formatPrice(build.totalMkd)}</p>
-            </div>
-            <button type="button" className="btn btn-primary" onClick={() => setCheckoutOpen(true)}>
-              {t("ai.buy")}
-            </button>
-          </div>
-        </div>
-      )}
 
       <CheckoutModal
         open={checkoutOpen}

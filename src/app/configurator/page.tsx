@@ -1354,6 +1354,7 @@ export default function ConfiguratorPage() {
             <p className="mt-2 text-xs font-medium text-[var(--warn)]">{slotWarning}</p>
           )}
           <p className="mt-1 text-[11px] text-[var(--text-muted)]">{t("builder.clickToDeselect")}</p>
+          <p className="mt-1 text-[11px] text-[var(--text-muted)]">{t("builder.usedHint")}</p>
           <div className="mt-2.5 flex justify-center">
             <div className="inline-flex rounded-full border border-[var(--border)] bg-[rgba(7,11,18,0.55)] p-0.5">
               {(
@@ -1377,9 +1378,6 @@ export default function ConfiguratorPage() {
               ))}
             </div>
           </div>
-          {condition === "used" && (
-            <p className="mt-2 text-sm text-[var(--text-muted)]">{t("builder.usedHint")}</p>
-          )}
 
           <div className="mt-3 grid grid-cols-2 gap-2.5 lg:grid-cols-3">
             {pagedOptions.map((part) => {

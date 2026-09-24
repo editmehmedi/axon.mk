@@ -63,7 +63,7 @@ export function Navbar() {
 
   return (
     <>
-    <header className="sticky top-0 z-[80] border-b border-[var(--border)] bg-[rgba(7,11,18,0.9)] backdrop-blur-xl">
+    <header className="sticky top-0 z-[80] isolate border-b border-[var(--border)] bg-[rgba(7,11,18,0.96)] backdrop-blur-xl">
       <div className="mx-auto max-w-7xl px-3 py-3 sm:px-4 md:px-6">
         <div className="flex items-center gap-2 sm:gap-3">
           <button

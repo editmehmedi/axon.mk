@@ -49,7 +49,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <LanguageProvider>
           <CurrencyProvider>
             <Navbar />
-            <main className="flex-1">{children}</main>
+            <main className="relative z-0 min-w-0 flex-1 isolate">{children}</main>
             <SiteFooter
               companyName={settings?.companyName?.trim() || "AXON.MK"}
               phone={publicPhone(settings?.supportPhone)}
