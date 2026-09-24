@@ -41,9 +41,7 @@ export function SiteFooter({
             </a>
           ) : null}
         </p>
-      ) : (
-        <p className="mt-2">{t("footer.callback")}</p>
-      )}
+      ) : null}
       <p className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
         <Link className="hover:text-[var(--cyan)]" href="/policies#terms">
           {t("footer.terms")}
