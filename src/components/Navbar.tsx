@@ -22,13 +22,13 @@ export function Navbar() {
 
   const NAV = [
     { href: "/prebuilts", label: t("nav.prebuilts") },
-    { href: "/used", label: t("nav.used") },
-    { href: "/used-parts", label: t("nav.usedParts") },
     { href: "/configurator", label: t("nav.configurator") },
-    { href: "/saved", label: t("nav.saved") },
     { href: "/ai-build", label: t("nav.ai") },
-    { href: "/sell", label: t("nav.sell") },
+    { href: "/used-parts", label: t("nav.usedParts") },
+    { href: "/saved", label: t("nav.saved") },
+    { href: "/used", label: t("nav.used") },
     { href: "/orders", label: t("nav.orders") },
+    { href: "/sell", label: t("nav.sell") },
   ];
 
   useEffect(() => {
