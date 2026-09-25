@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import Link from "next/link";
 import { resolvePrebuiltImage } from "@/lib/partImages";
 import { getPrebuiltSpecs } from "@/lib/prebuiltSpecs";
 import { ProductImage } from "./ProductImage";
@@ -127,21 +128,31 @@ export function PrebuiltDetailModal({ pc, open, onClose, onBuy }: Props) {
         </div>
         </div>
 
-        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--border)] p-4 sm:p-5">
-          <p className="section-title text-2xl text-[var(--cyan)]">
-            {formatPrice(pc.priceMkd)}
-          </p>
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] p-4 sm:p-5">
+          <div>
+            <p className="section-title text-2xl text-[var(--cyan)]">
+              {formatPrice(pc.priceMkd)}
+            </p>
+            {!pc.listingId ? (
+              <p className="mt-1 text-xs text-[var(--text-muted)]">{t("prebuilts.editHint")}</p>
+            ) : null}
+          </div>
           {pc.listingId ? (
             <span className="text-sm text-[var(--text-muted)]">{t("used.communityHint")}</span>
           ) : (
-            <button
-              type="button"
-              disabled={!inStock}
-              onClick={onBuy}
-              className="btn btn-success !py-2.5 !text-sm"
-            >
-              {inStock ? t("prebuilts.buyCod") : t("prebuilts.outOfStock")}
-            </button>
+            <div className="flex items-center gap-2">
+              <Link href={`/configurator?edit=${encodeURIComponent(pc.slug)}`} className="btn btn-ghost !py-2.5 !text-sm">
+                {t("prebuilts.edit")}
+              </Link>
+              <button
+                type="button"
+                disabled={!inStock}
+                onClick={onBuy}
+                className="btn btn-success !py-2.5 !text-sm"
+              >
+                {inStock ? t("prebuilts.buyCod") : t("prebuilts.outOfStock")}
+              </button>
+            </div>
           )}
         </div>
       </div>

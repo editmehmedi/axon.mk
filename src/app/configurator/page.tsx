@@ -48,6 +48,7 @@ import { useCurrency } from "@/components/CurrencyProvider";
 import { PartFilters, type PartFilterState } from "@/components/PartFilters";
 import { ProductImage } from "@/components/ProductImage";
 import { inferListingGpuTdp } from "@/lib/listingPower";
+import { selectionFromPrebuiltLabels, type PrebuiltPartLabels } from "@/lib/prebuiltEdit";
 import { resolvePartImage } from "@/lib/partImages";
 import { fetchSessionUser, loginUrl } from "@/lib/clientAuth";
 import {
@@ -55,12 +56,14 @@ import {
   consumeBuilderCheckoutPending,
   draftHasPicks,
   draftNeedsCatalog,
+  getSavedBuild,
   hydrateSelection,
   loadBuilderDraft,
   markBuilderCheckoutPending,
   peekBuilderCheckoutPending,
   saveBuilderDraft,
   serializeSelection,
+  upsertSavedBuild,
 } from "@/lib/builderDraft";
 
 type Part = CompatPart & {
@@ -266,6 +269,9 @@ export default function ConfiguratorPage() {
   const [usedPartsReady, setUsedPartsReady] = useState(false);
   const [draftReady, setDraftReady] = useState(false);
   const [resumeCheckout, setResumeCheckout] = useState(false);
+  const [editingName, setEditingName] = useState("");
+  const [activeSavedId, setActiveSavedId] = useState("");
+  const [savedFlash, setSavedFlash] = useState(false);
   const [pricingOpen, setPricingOpen] = useState(false);
   const [cartBump, setCartBump] = useState(false);
   const [throwClones, setThrowClones] = useState<
@@ -331,7 +337,7 @@ export default function ConfiguratorPage() {
               ({
                 id: `listing:${l.id}`,
                 name: l.name,
-                brand: l.sellerName || "Used",
+                brand: l.category === "GPU" ? "Used" : l.sellerName || "Used",
                 category: l.category,
                 priceMkd: l.priceMkd,
                 stock: 1,
@@ -360,6 +366,60 @@ export default function ConfiguratorPage() {
 
   useEffect(() => {
     if (draftHydrated.current || partsLoading || !usedPartsReady) return;
+    const editSlug =
+      typeof window === "undefined"
+        ? ""
+        : new URLSearchParams(window.location.search).get("edit")?.trim() ?? "";
+    if (editSlug && newParts.length > 0) {
+      draftHydrated.current = true;
+      let cancelled = false;
+      fetch("/api/prebuilts")
+        .then((r) => r.json())
+        .then((data: { items?: (PrebuiltPartLabels & { slug: string; name: string })[] }) => {
+          if (cancelled) return;
+          const pc = (data.items ?? []).find((item) => item.slug === editSlug);
+          if (pc) {
+            const matched = selectionFromPrebuiltLabels(newParts, pc);
+            setCondition("new");
+            setStep(0);
+            setSelection(matched.selection);
+            setRamQtyById(matched.ramQtyById);
+            setSsdQtyById({});
+            setEditingName(pc.name);
+          }
+          window.history.replaceState(null, "", "/configurator");
+          setDraftReady(true);
+        })
+        .catch(() => {
+          if (!cancelled) setDraftReady(true);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+    const savedId =
+      typeof window === "undefined"
+        ? ""
+        : new URLSearchParams(window.location.search).get("draft")?.trim() ?? "";
+    if (savedId) {
+      const saved = getSavedBuild(savedId);
+      if (saved && draftNeedsCatalog(saved.ids) && newParts.length === 0 && usedParts.length === 0) {
+        return;
+      }
+      draftHydrated.current = true;
+      if (saved) {
+        const catalog = [...newParts, ...usedParts];
+        setCondition(saved.condition);
+        setStep(Math.max(0, Math.min(BUILDER_STEPS.length - 1, saved.step)));
+        setSelection(hydrateSelection(saved.ids, catalog));
+        setRamQtyById(saved.ramQtyById);
+        setSsdQtyById(saved.ssdQtyById);
+        setActiveSavedId(saved.id);
+      }
+      window.history.replaceState(null, "", "/configurator");
+      setDraftReady(true);
+      return;
+    }
     const draft = loadBuilderDraft();
     if (draft && draftNeedsCatalog(draft.ids) && newParts.length === 0 && usedParts.length === 0) {
       return;
@@ -770,7 +830,42 @@ export default function ConfiguratorPage() {
     setSlotWarning(null);
     setCondition("new");
     setStep(0);
+    setActiveSavedId("");
+    setEditingName("");
     clearBuilderDraft();
+  }
+
+  function saveCurrentBuild() {
+    const ids = serializeSelection(selection);
+    if (!draftHasPicks(ids)) return;
+    const lines = BUILDER_STEPS.flatMap((cat) => {
+      const picked =
+        cat === "SSD" ? (selection.SSD ?? []) : selection[cat] ? [selection[cat]] : [];
+      return picked
+        .filter((part): part is Part => Boolean(part))
+        .map((part) => ({
+          category: cat,
+          label: partLabel(part, t("builder.usedBadge")),
+        }));
+    });
+    const cpu = lines.find((line) => line.category === "CPU")?.label;
+    const id = activeSavedId || `saved-${Date.now()}`;
+    const existing = activeSavedId ? getSavedBuild(activeSavedId) : null;
+    const name = editingName.trim() || existing?.name || cpu || t("saved.defaultName");
+    upsertSavedBuild({
+      id,
+      name,
+      savedAt: Date.now(),
+      condition,
+      step,
+      ids,
+      ramQtyById,
+      ssdQtyById,
+      lines,
+    });
+    setActiveSavedId(id);
+    setSavedFlash(true);
+    window.setTimeout(() => setSavedFlash(false), 1600);
   }
 
   function conditionForStep(index: number, current: "new" | "used"): "new" | "used" {
@@ -1038,6 +1133,11 @@ export default function ConfiguratorPage() {
       <div className="mb-8">
         <h1 className="section-title text-3xl md:text-4xl">{t("builder.title")}</h1>
         <p className="mt-2 text-[var(--text-muted)]">{t("builder.desc")}</p>
+        {editingName ? (
+          <p className="mt-2 text-sm text-[var(--cyan)]">
+            {t("builder.editingPrebuilt", { name: editingName })}
+          </p>
+        ) : null}
       </div>
 
       <div className="mb-6 hidden flex-wrap gap-2 lg:flex">
@@ -1344,6 +1444,14 @@ export default function ConfiguratorPage() {
             <div className="hidden shrink-0 items-center gap-2 lg:flex">
               <button
                 type="button"
+                onClick={saveCurrentBuild}
+                disabled={!canClear}
+                className="rounded-lg border border-[var(--border)] px-3.5 py-2 text-sm font-medium text-[var(--cyan)] transition enabled:hover:border-[var(--cyan)] enabled:hover:bg-[rgba(34,211,238,0.1)] disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                {savedFlash ? t("builder.saved") : t("builder.saveDraft")}
+              </button>
+              <button
+                type="button"
                 onClick={clearAll}
                 disabled={!canClear}
                 className="rounded-lg border border-[var(--border)] px-3.5 py-2 text-sm font-medium text-[var(--danger)] transition enabled:hover:border-[var(--danger)] enabled:hover:bg-[rgba(251,113,133,0.1)] disabled:cursor-not-allowed disabled:opacity-35"
@@ -1490,7 +1598,9 @@ export default function ConfiguratorPage() {
                   </div>
                   <p className="truncate text-[10px] text-[var(--cyan-dim)]">
                     {condition === "used"
-                      ? t("builder.sellerLabel", { name: part.brand })
+                      ? part.category === "GPU"
+                        ? t("builder.usedBadge")
+                        : t("builder.sellerLabel", { name: part.brand })
                       : part.brand}
                   </p>
                   <p className="mt-0.5 line-clamp-2 text-xs font-medium leading-snug">{part.name}</p>
@@ -1651,14 +1761,24 @@ export default function ConfiguratorPage() {
             })}
           </div>
           <div className="mx-auto mt-1.5 flex max-w-[1600px] flex-col gap-1.5">
-            <button
-              type="button"
-              onClick={clearAll}
-              disabled={!canClear}
-              className="min-h-8 rounded-lg text-xs font-semibold text-[var(--danger)] transition enabled:active:scale-[0.98] enabled:hover:bg-[rgba(251,113,133,0.1)] disabled:cursor-not-allowed disabled:opacity-35"
-            >
-              {t("builder.clearAll")}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={saveCurrentBuild}
+                disabled={!canClear}
+                className="min-h-8 flex-1 rounded-lg text-xs font-semibold text-[var(--cyan)] transition enabled:active:scale-[0.98] enabled:hover:bg-[rgba(34,211,238,0.1)] disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                {savedFlash ? t("builder.saved") : t("builder.saveDraft")}
+              </button>
+              <button
+                type="button"
+                onClick={clearAll}
+                disabled={!canClear}
+                className="min-h-8 flex-1 rounded-lg text-xs font-semibold text-[var(--danger)] transition enabled:active:scale-[0.98] enabled:hover:bg-[rgba(251,113,133,0.1)] disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                {t("builder.clearAll")}
+              </button>
+            </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"

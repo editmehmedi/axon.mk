@@ -3,10 +3,15 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 
-const patchSchema = z.object({
-  id: z.string().min(1),
-  status: z.enum(["active", "rejected", "hidden"]),
-});
+const patchSchema = z
+  .object({
+    id: z.string().min(1),
+    status: z.enum(["active", "rejected", "hidden"]).optional(),
+    priceMkd: z.number().int().min(1).max(10_000_000).optional(),
+  })
+  .refine((data) => data.status !== undefined || data.priceMkd !== undefined, {
+    message: "Nothing to update",
+  });
 
 export async function GET() {
   try {
@@ -56,7 +61,10 @@ export async function PATCH(req: Request) {
 
     const item = await prisma.userListing.update({
       where: { id: body.id },
-      data: { status: body.status },
+      data: {
+        ...(body.status ? { status: body.status } : {}),
+        ...(body.priceMkd !== undefined ? { priceMkd: body.priceMkd } : {}),
+      },
       include: {
         seller: { select: { id: true, name: true, email: true, phone: true } },
       },

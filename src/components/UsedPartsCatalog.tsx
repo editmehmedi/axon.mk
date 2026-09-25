@@ -111,9 +111,11 @@ export function UsedPartsCatalog() {
                   {item.description ? (
                     <p className="line-clamp-2 text-sm text-[var(--text-muted)]">{item.description}</p>
                   ) : null}
-                  <p className="text-xs text-[var(--text-muted)]">
-                    {t("sell.seller", { name: item.sellerName })}
-                  </p>
+                  {item.category === "GPU" ? null : (
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {t("sell.seller", { name: item.sellerName })}
+                    </p>
+                  )}
                   <p className="mt-auto section-title text-xl text-[var(--cyan)]">
                     {formatPrice(item.priceMkd)}
                   </p>

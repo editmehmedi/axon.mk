@@ -3,6 +3,7 @@ import { createNonePart, type CompatPart, type CompatSelection } from "@/lib/com
 
 const DRAFT_KEY = "axon_builder_draft";
 const CHECKOUT_KEY = "axon_builder_checkout";
+const SAVED_KEY = "axon_saved_builds";
 
 export type BuilderDraft = {
   v: 1;
@@ -96,6 +97,67 @@ export function draftNeedsCatalog(ids: BuilderDraft["ids"] | undefined): boolean
     const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
     return list.some((id) => id && !id.startsWith("none:"));
   });
+}
+
+export type SavedBuild = {
+  id: string;
+  name: string;
+  savedAt: number;
+  condition: "new" | "used";
+  step: number;
+  ids: BuilderDraft["ids"];
+  ramQtyById: Record<string, number>;
+  ssdQtyById: Record<string, number>;
+  lines: { category: string; label: string }[];
+};
+
+function readSavedBuilds(): SavedBuild[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(SAVED_KEY);
+    if (!raw) return [];
+    const data = JSON.parse(raw) as unknown;
+    if (!Array.isArray(data)) return [];
+    return data.filter((item): item is SavedBuild => {
+      if (!item || typeof item !== "object") return false;
+      const row = item as Partial<SavedBuild>;
+      return Boolean(row.id && row.name && row.ids && typeof row.ids === "object");
+    });
+  } catch {
+    return [];
+  }
+}
+
+function writeSavedBuilds(items: SavedBuild[]) {
+  localStorage.setItem(SAVED_KEY, JSON.stringify(items.slice(0, 30)));
+}
+
+export function listSavedBuilds(): SavedBuild[] {
+  return readSavedBuilds().sort((a, b) => b.savedAt - a.savedAt);
+}
+
+export function getSavedBuild(id: string): SavedBuild | null {
+  return readSavedBuilds().find((item) => item.id === id) ?? null;
+}
+
+export function upsertSavedBuild(build: SavedBuild): SavedBuild {
+  if (typeof window === "undefined") return build;
+  const rest = readSavedBuilds().filter((item) => item.id !== build.id);
+  try {
+    writeSavedBuilds([build, ...rest]);
+  } catch {
+    /* quota / private mode */
+  }
+  return build;
+}
+
+export function deleteSavedBuild(id: string) {
+  if (typeof window === "undefined") return;
+  try {
+    writeSavedBuilds(readSavedBuilds().filter((item) => item.id !== id));
+  } catch {
+    /* ignore */
+  }
 }
 
 export function hydrateSelection(

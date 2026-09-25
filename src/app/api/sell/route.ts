@@ -122,7 +122,19 @@ export async function GET(req: Request) {
       orderBy: { createdAt: "desc" },
       take: 100,
     });
-    return NextResponse.json({ items: items.map(mapListing) });
+    return NextResponse.json({
+      items: items.map((row) => {
+        const item = mapListing(row);
+        if (row.category !== "GPU") return item;
+        return {
+          ...item,
+          sellerId: "",
+          sellerName: "",
+          sellerPhone: null,
+          sellerEmail: null,
+        };
+      }),
+    });
   } catch (e) {
     console.error("[sell GET]", e);
     return NextResponse.json({ error: "Failed to load listings" }, { status: 500 });

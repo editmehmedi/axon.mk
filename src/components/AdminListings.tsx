@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ProductImage } from "@/components/ProductImage";
 import { useI18n } from "@/components/LanguageProvider";
-import { formatMkd } from "@/lib/constants";
 import { proxiedExternalImage } from "@/lib/partImages";
 
 type AdminListing = {
@@ -25,6 +24,7 @@ export function AdminListings({ onMessage }: { onMessage?: (msg: string) => void
   const [items, setItems] = useState<AdminListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"pending" | "all">("pending");
+  const [prices, setPrices] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -47,11 +47,19 @@ export function AdminListings({ onMessage }: { onMessage?: (msg: string) => void
     void load();
   }, [load]);
 
-  async function setStatus(id: string, status: "active" | "rejected" | "hidden") {
+  async function setStatus(
+    id: string,
+    status: "active" | "rejected" | "hidden",
+    priceMkd?: number,
+  ) {
     const res = await fetch("/api/admin/listings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, status }),
+      body: JSON.stringify({
+        id,
+        status,
+        ...(priceMkd !== undefined ? { priceMkd } : {}),
+      }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -84,7 +92,46 @@ export function AdminListings({ onMessage }: { onMessage?: (msg: string) => void
     await load();
   }
 
-  const visible = items.filter((i) => (filter === "pending" ? i.status === "pending" : true));
+  function priceValue(item: AdminListing) {
+    return prices[item.id] ?? String(item.priceMkd);
+  }
+
+  function parsedPrice(item: AdminListing): number | null {
+    const priceMkd = Number(priceValue(item));
+    if (!Number.isInteger(priceMkd) || priceMkd < 1) return null;
+    return priceMkd;
+  }
+
+  async function savePrice(item: AdminListing) {
+    const priceMkd = parsedPrice(item);
+    if (priceMkd == null) {
+      onMessage?.(t("admin.priceInvalid"));
+      return;
+    }
+    const res = await fetch("/api/admin/listings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: item.id, priceMkd }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      onMessage?.(data.error || t("admin.listingsError"));
+      return;
+    }
+    onMessage?.(t("admin.priceSaved"));
+    await load();
+  }
+
+  async function approve(item: AdminListing) {
+    const priceMkd = parsedPrice(item);
+    if (priceMkd == null) {
+      onMessage?.(t("admin.priceInvalid"));
+      return;
+    }
+    await setStatus(item.id, "active", priceMkd);
+  }
+
+  const visible = items.filter((item) => (filter === "pending" ? item.status === "pending" : true));
   const pendingCount = items.filter((i) => i.status === "pending").length;
 
   function categoryLabel(category: string) {
@@ -163,9 +210,28 @@ export function AdminListings({ onMessage }: { onMessage?: (msg: string) => void
                       {statusLabel(item.status)}
                     </span>
                   </div>
-                  <p className="mt-1 section-title text-lg text-[var(--cyan)]">
-                    {formatMkd(item.priceMkd)}
-                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <label className="text-xs text-[var(--text-muted)]" htmlFor={`price-${item.id}`}>
+                      {t("admin.colPrice")}
+                    </label>
+                    <input
+                      id={`price-${item.id}`}
+                      type="number"
+                      min={1}
+                      className="input w-32 !py-1.5 !text-sm"
+                      value={priceValue(item)}
+                      onChange={(e) =>
+                        setPrices((current) => ({ ...current, [item.id]: e.target.value }))
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-ghost !px-3 !py-1.5 !text-xs"
+                      onClick={() => void savePrice(item)}
+                    >
+                      {t("admin.savePrice")}
+                    </button>
+                  </div>
                   {item.description ? (
                     <p className="mt-1 text-sm text-[var(--text-muted)]">{item.description}</p>
                   ) : null}
@@ -179,7 +245,7 @@ export function AdminListings({ onMessage }: { onMessage?: (msg: string) => void
                         <button
                           type="button"
                           className="btn btn-success !px-3 !py-1.5 !text-xs"
-                          onClick={() => void setStatus(item.id, "active")}
+                          onClick={() => void approve(item)}
                         >
                           {t("admin.approveListing")}
                         </button>
@@ -205,7 +271,7 @@ export function AdminListings({ onMessage }: { onMessage?: (msg: string) => void
                       <button
                         type="button"
                         className="btn btn-success !px-3 !py-1.5 !text-xs"
-                        onClick={() => void setStatus(item.id, "active")}
+                        onClick={() => void approve(item)}
                       >
                         {t("admin.approveListing")}
                       </button>

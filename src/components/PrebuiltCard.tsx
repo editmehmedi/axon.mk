@@ -122,8 +122,18 @@ export function PrebuiltCard({
           </p>
         )}
 
-        <div className="mt-auto flex items-center justify-between gap-3 pt-2">
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-2">
           <p className="section-title text-xl text-[var(--cyan)]">{formatPrice(pc.priceMkd)}</p>
+          <div className="flex items-center gap-2">
+          {!pc.listingId ? (
+            <Link
+              href={`/configurator?edit=${encodeURIComponent(pc.slug)}`}
+              onClick={(e) => e.stopPropagation()}
+              className="btn btn-ghost !py-2 !text-xs"
+            >
+              {t("prebuilts.edit")}
+            </Link>
+          ) : null}
           {onBuy && !pc.listingId ? (
             <button
               type="button"
@@ -147,6 +157,7 @@ export function PrebuiltCard({
               {inStock ? t("prebuilts.buyCod") : t("prebuilts.outOfStock")}
             </Link>
           )}
+          </div>
         </div>
       </div>
     </article>

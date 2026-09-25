@@ -883,7 +883,7 @@ type Props = {
   onMessage: (msg: string) => void;
 };
 
-type InvView = "parts" | "prebuilts" | "used";
+type InvView = "parts" | "usedParts" | "prebuilts" | "used";
 
 export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props) {
   const { t } = useI18n();
@@ -899,6 +899,18 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
   const [editingPrebuiltId, setEditingPrebuiltId] = useState<string | null>(null);
   const [prebuiltDraft, setPrebuiltDraft] = useState<PrebuiltDraft>(emptyPrebuiltDraft());
   const [usedParts, setUsedParts] = useState<AdminPart[]>([]);
+  const [inventoryListings, setInventoryListings] = useState<
+    {
+      id: string;
+      name: string;
+      category: string;
+      priceMkd: number;
+      status: string;
+      sellerName: string;
+      imageUrl: string | null;
+    }[]
+  >([]);
+  const [listingPrices, setListingPrices] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -915,6 +927,34 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
       })
       .catch(() => {
         if (!cancelled) setUsedParts([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/listings")
+      .then((r) => r.json())
+      .then(
+        (d: {
+          items?: {
+            id: string;
+            name: string;
+            category: string;
+            priceMkd: number;
+            status: string;
+            sellerName: string;
+            imageUrl: string | null;
+          }[];
+        }) => {
+          if (cancelled) return;
+          setInventoryListings((d.items ?? []).filter((item) => item.category !== "PC"));
+        },
+      )
+      .catch(() => {
+        if (!cancelled) setInventoryListings([]);
       });
     return () => {
       cancelled = true;
@@ -940,6 +980,30 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
     for (const p of parts) counts[p.category] = (counts[p.category] || 0) + 1;
     return counts;
   }, [parts]);
+
+  async function saveListingPrice(id: string) {
+    const priceMkd = Number(
+      listingPrices[id] ?? inventoryListings.find((item) => item.id === id)?.priceMkd,
+    );
+    if (!Number.isInteger(priceMkd) || priceMkd < 1) {
+      onMessage(t("admin.priceInvalid"));
+      return;
+    }
+    const res = await fetch("/api/admin/listings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, priceMkd }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      onMessage(data.error || t("admin.listingsError"));
+      return;
+    }
+    setInventoryListings((current) =>
+      current.map((item) => (item.id === id ? { ...item, priceMkd } : item)),
+    );
+    onMessage(t("admin.priceSaved"));
+  }
 
   function switchView(next: InvView) {
     setView(next);
@@ -1278,6 +1342,7 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
 
   const views: { id: InvView; label: string; count: number }[] = [
     { id: "parts", label: t("admin.parts"), count: parts.length },
+    { id: "usedParts", label: t("admin.usedParts"), count: inventoryListings.length },
     { id: "prebuilts", label: t("admin.prebuilts"), count: newPrebuilts.length },
     { id: "used", label: t("admin.usedPcs"), count: usedPrebuilts.length },
   ];
@@ -1571,6 +1636,48 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
                 </div>
               ))}
             </div>
+          )}
+        </div>
+      )}
+
+      {view === "usedParts" && (
+        <div className="space-y-4">
+          <div>
+            <h2 className="section-title text-xl">{t("admin.usedParts")}</h2>
+            <p className="mt-1 max-w-xl text-sm text-[var(--text-muted)]">{t("admin.usedPartsHint")}</p>
+          </div>
+          {inventoryListings.length === 0 ? (
+            <EmptyState>{t("admin.listingsEmpty")}</EmptyState>
+          ) : (
+            <ul className="space-y-2">
+              {inventoryListings.map((item) => (
+                <li key={item.id} className="glass flex flex-wrap items-center gap-3 rounded-xl px-3 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-[var(--text)]">{item.name}</p>
+                    <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                      {item.category} · {item.sellerName} · {item.status}
+                    </p>
+                  </div>
+                  <input
+                    type="number"
+                    min={1}
+                    className="input w-32 !py-1.5 !text-sm"
+                    aria-label={t("admin.colPrice")}
+                    value={listingPrices[item.id] ?? String(item.priceMkd)}
+                    onChange={(e) =>
+                      setListingPrices((current) => ({ ...current, [item.id]: e.target.value }))
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-ghost !px-3 !py-1.5 !text-xs"
+                    onClick={() => void saveListingPrice(item.id)}
+                  >
+                    {t("admin.savePrice")}
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       )}
