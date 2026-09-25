@@ -329,8 +329,11 @@ export async function POST(req: Request) {
       if (hasBlockingErrors(issues)) {
         return NextResponse.json({ error: "Некомпатибилна конфигурација", issues }, { status: 400 });
       }
-      if (!single("PSU")) {
-        return NextResponse.json({ error: "A power supply is required" }, { status: 400 });
+      if (!single("CPU") || !single("MOTHERBOARD") || !single("CASE")) {
+        return NextResponse.json(
+          { error: "CPU, motherboard, and case are required" },
+          { status: 400 },
+        );
       }
 
       const settings = await prisma.siteSettings.findUnique({ where: { id: 1 } });

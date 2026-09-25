@@ -11,7 +11,7 @@ type Props = {
   onClose: () => void;
   title: string;
   totalMkd: number;
-  needsToRun?: Array<"ram" | "gpu" | "ssd">;
+  needsToRun?: Array<"ram" | "gpu" | "ssd" | "psu" | "cooler">;
   onSubmit: (data: {
     customerName: string;
     customerPhone: string;
@@ -117,6 +117,8 @@ export function CheckoutModal({ open, onClose, title, totalMkd, needsToRun = [],
               <ul className="mt-3 space-y-1 border-t border-[var(--border)] pt-3 text-sm text-[var(--warn)]">
                 {needsToRun.includes("ram") ? <li>{t("checkout.needsRam")}</li> : null}
                 {needsToRun.includes("gpu") ? <li>{t("checkout.needsGpu")}</li> : null}
+                {needsToRun.includes("psu") ? <li>{t("checkout.needsPsu")}</li> : null}
+                {needsToRun.includes("cooler") ? <li>{t("checkout.needsCooler")}</li> : null}
                 {needsToRun.includes("ssd") ? <li>{t("checkout.needsSsd")}</li> : null}
               </ul>
             )}

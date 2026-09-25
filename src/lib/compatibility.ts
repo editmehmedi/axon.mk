@@ -328,15 +328,20 @@ export function hasRealPsu(sel: CompatSelection): boolean {
   return Boolean(sel.PSU && !isNonePart(sel.PSU));
 }
 
+/** Only these parts are required to place a custom-build order. */
+export const REQUIRED_BUILDER_STEPS = ["CPU", "MOTHERBOARD", "CASE"] as const;
+
 export function isStepComplete(sel: CompatSelection, category: keyof CompatSelection): boolean {
-  if (category === "SSD" || category === "GPU") {
-    // Storage and graphics are optional: no pick (or an explicit skip) still completes the build.
+  if (
+    category !== "CPU" &&
+    category !== "MOTHERBOARD" &&
+    category !== "CASE"
+  ) {
     return true;
   }
-  if (category === "PSU") return hasRealPsu(sel);
   const v = sel[category];
-  if (!v || Array.isArray(v)) return false;
-  return true; // real part or None sentinel
+  if (!v || Array.isArray(v) || isNonePart(v)) return false;
+  return true;
 }
 
 /** Empty SSD step → explicit skip so checkout/pricing treat it as “no storage”. */
@@ -669,6 +674,7 @@ export function compatibilityFilterHint(sel: CompatSelection, category: string):
     if (slots) return `${slots} SSD slot${slots === 1 ? "" : "s"}`;
     return "pick SSD quantity (or Next to skip)";
   }
+  if (category === "CPU" || category === "MOTHERBOARD" || category === "CASE") return null;
   return "or Next to skip";
 }
 
@@ -684,7 +690,6 @@ export function checkCompatibility(
   const psu = sel.PSU && !isNonePart(sel.PSU) ? sel.PSU : null;
   const pcCase = sel.CASE && !isNonePart(sel.CASE) ? sel.CASE : null;
   const cooler = sel.COOLER && !isNonePart(sel.COOLER) ? sel.COOLER : null;
-  const coolerSkipped = Boolean(sel.COOLER && isNonePart(sel.COOLER));
   const ssds = getSsds(sel);
   const ramQty = qty?.ramQty ?? 1;
   const ssdQty = qty?.ssdQty ?? (ssds.length || 1);
@@ -696,13 +701,6 @@ export function checkCompatibility(
         message: `Socket mismatch: CPU (${cpu.socket}) ↔ Motherboard (${mb.socket})`,
       });
     }
-  }
-
-  if (cpu && cpuNeedsCooler(cpu) && !cooler && !coolerSkipped) {
-    issues.push({
-      severity: "error",
-      message: `CPU has no stock fan — pick a cooler (e.g. ${cpu.name})`,
-    });
   }
 
   if (cpu && cooler) {

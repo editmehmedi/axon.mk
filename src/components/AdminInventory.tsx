@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { formatMkd } from "@/lib/constants";
 import { useI18n } from "@/components/LanguageProvider";
 import { ProductImage } from "@/components/ProductImage";
@@ -22,6 +22,7 @@ import {
   type CompatSelection,
 } from "@/lib/compatibility";
 import { describeReadyPc, PREBUILT_MARKUP } from "@/lib/prebuiltFromParts";
+import { inferListingGpuTdp } from "@/lib/listingPower";
 
 export type AdminPart = {
   id: string;
@@ -38,6 +39,8 @@ export type AdminPart = {
   includesCooler?: boolean | null;
   imageUrl?: string | null;
   active?: boolean;
+  /** Marketplace listing mapped into the prebuilt picker. */
+  source?: "new" | "used";
 };
 
 type Prebuilt = {
@@ -154,6 +157,31 @@ function toCompatPart(part: AdminPart): CompatPart {
     includesCooler: part.includesCooler,
     priceMkd: part.priceMkd,
     stock: part.stock,
+  };
+}
+
+const BUILDER_CATEGORIES = new Set<string>(SLOT_FIELDS.map(([slot]) => slot));
+
+function listingToAdminPart(listing: {
+  id: string;
+  name: string;
+  category: string;
+  priceMkd: number;
+  imageUrl: string | null;
+  sellerName: string;
+}): AdminPart | null {
+  if (!BUILDER_CATEGORIES.has(listing.category)) return null;
+  return {
+    id: `listing:${listing.id}`,
+    name: listing.name,
+    brand: listing.sellerName || "Used",
+    category: listing.category,
+    priceMkd: listing.priceMkd,
+    stock: 1,
+    imageUrl: listing.imageUrl,
+    tdpWatts: listing.category === "GPU" ? inferListingGpuTdp(listing.name) : null,
+    active: true,
+    source: "used",
   };
 }
 
@@ -343,6 +371,13 @@ function selectionForCheck(draft: PrebuiltDraft, parts: AdminPart[]): CompatSele
     };
   }
   return sel;
+}
+
+function partOptionLabel(part: AdminPart, t: (key: string, vars?: Record<string, string | number>) => string) {
+  const price = `${part.brand} ${part.name} — ${formatMkd(part.priceMkd)}`;
+  if (part.source === "used") return price;
+  if (part.stock <= 0) return `${price} (${t("admin.outOfStock")})`;
+  return `${price} (${t("admin.stockCount", { count: part.stock })})`;
 }
 
 function slotOptions(parts: AdminPart[], category: SlotId, draft: PrebuiltDraft): AdminPart[] {
@@ -551,6 +586,8 @@ function PrebuiltForm({
           <div className="grid gap-3 sm:grid-cols-2">
             {SLOT_FIELDS.map(([slot, labelKey, titleKey]) => {
               const options = slotOptions(parts, slot, draft);
+              const newOptions = options.filter((part) => part.source !== "used");
+              const usedOptions = options.filter((part) => part.source === "used");
               const showIgpu = slot === "GPU" && Boolean(cpu && cpuHasIntegratedGraphics(toCompatPart(cpu)));
               const showStock = slot === "COOLER" && Boolean(cpu && !cpuNeedsCooler(toCompatPart(cpu)));
               const unmatched = !draft.slots[slot] && draft[labelKey].trim();
@@ -577,14 +614,32 @@ function PrebuiltForm({
                     <option value="">{t("admin.selectPart")}</option>
                     {showIgpu && <option value={IGPU}>{t("admin.integratedGraphics")}</option>}
                     {showStock && <option value={STOCK_COOLER}>{t("admin.includedCooler")}</option>}
-                    {options.map((part) => (
-                      <option key={part.id} value={part.id}>
-                        {part.brand} {part.name} — {formatMkd(part.priceMkd)}
-                        {part.stock <= 0
-                          ? ` (${t("admin.outOfStock")})`
-                          : ` (${t("admin.stockCount", { count: part.stock })})`}
-                      </option>
-                    ))}
+                    {usedOptions.length === 0
+                      ? newOptions.map((part) => (
+                          <option key={part.id} value={part.id}>
+                            {partOptionLabel(part, t)}
+                          </option>
+                        ))
+                      : (
+                        <>
+                          {newOptions.length > 0 && (
+                            <optgroup label={t("builder.conditionNew")}>
+                              {newOptions.map((part) => (
+                                <option key={part.id} value={part.id}>
+                                  {partOptionLabel(part, t)}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                          <optgroup label={t("builder.conditionUsed")}>
+                            {usedOptions.map((part) => (
+                              <option key={part.id} value={part.id}>
+                                {partOptionLabel(part, t)}
+                              </option>
+                            ))}
+                          </optgroup>
+                        </>
+                      )}
                   </select>
                   {slot === "RAM" && draft.slots.RAM && (
                     <label className="mt-2 block">
@@ -843,7 +898,30 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
   const [addingPrebuilt, setAddingPrebuilt] = useState(false);
   const [editingPrebuiltId, setEditingPrebuiltId] = useState<string | null>(null);
   const [prebuiltDraft, setPrebuiltDraft] = useState<PrebuiltDraft>(emptyPrebuiltDraft());
+  const [usedParts, setUsedParts] = useState<AdminPart[]>([]);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/sell?partsOnly=1")
+      .then((r) => r.json())
+      .then((d: { items?: Parameters<typeof listingToAdminPart>[0][] }) => {
+        if (cancelled) return;
+        setUsedParts(
+          (d.items ?? [])
+            .map(listingToAdminPart)
+            .filter((part): part is AdminPart => part !== null),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setUsedParts([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const builderParts = useMemo(() => [...parts, ...usedParts], [parts, usedParts]);
 
   const newPrebuilts = useMemo(
     () => prebuilts.filter((p) => p.condition !== "used"),
@@ -889,8 +967,28 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
   function startEditPrebuilt(p: Prebuilt) {
     setAddingPrebuilt(false);
     setEditingPrebuiltId(p.id);
-    setPrebuiltDraft(draftFromPrebuilt(p, parts));
+    setPrebuiltDraft(draftFromPrebuilt(p, builderParts));
   }
+
+  useEffect(() => {
+    if (!editingPrebuiltId || usedParts.length === 0) return;
+    const pc = prebuilts.find((item) => item.id === editingPrebuiltId);
+    if (!pc || pc.condition === "used") return;
+    const matched = draftFromPrebuilt(pc, builderParts);
+    setPrebuiltDraft((current) => {
+      if (current.condition !== "new") return current;
+      let changed = false;
+      const slots = { ...current.slots };
+      for (const [category] of SLOT_FIELDS) {
+        if (!slots[category] && matched.slots[category]) {
+          slots[category] = matched.slots[category];
+          changed = true;
+        }
+      }
+      if (!changed) return current;
+      return { ...current, slots, ramQty: matched.ramQty || current.ramQty };
+    });
+  }, [editingPrebuiltId, usedParts, builderParts, prebuilts]);
 
   function cancelPrebuiltForm() {
     setAddingPrebuilt(false);
@@ -1123,7 +1221,7 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
       onMessage(t("admin.prebuiltRequired"));
       return;
     }
-    if (prebuiltDraft.condition === "new" && hasBlockingErrors(checkCompatibility(selectionForCheck(prebuiltDraft, parts), { ramQty: prebuiltDraft.ramQty }))) {
+    if (prebuiltDraft.condition === "new" && hasBlockingErrors(checkCompatibility(selectionForCheck(prebuiltDraft, builderParts), { ramQty: prebuiltDraft.ramQty }))) {
       onMessage(t("admin.prebuiltCompat"));
       return;
     }
@@ -1546,7 +1644,7 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
             <PrebuiltForm
               draft={prebuiltDraft}
               setDraft={setPrebuiltDraft}
-              parts={parts}
+              parts={builderParts}
               fromCatalog={view === "prebuilts"}
               busy={busy}
               showConditionGrade={view === "used"}

@@ -412,14 +412,14 @@ export default function ConfiguratorPage() {
   }, [compatibleOptions]);
 
   useEffect(() => {
-    setFilters({
+    setFilters((prev) => ({
       search: "",
       brand: "",
       ramType: "",
-      sort: "price-asc",
+      sort: prev.sort,
       priceMin: priceBounds.min,
       priceMax: priceBounds.max,
-    });
+    }));
     setPage(1);
   }, [currentCat, condition, priceBounds.min, priceBounds.max]);
 
@@ -653,16 +653,27 @@ export default function ConfiguratorPage() {
       return;
     }
     const id = window.requestAnimationFrame(() => {
-      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      const el = stepPanelRef.current;
-      if (el) {
-        el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
-      } else {
-        window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
-      }
+      scrollBuilderToTop();
     });
     return () => window.cancelAnimationFrame(id);
   }, [step, draftReady]);
+
+  function scrollBuilderToTop() {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const el = stepPanelRef.current;
+    if (el) {
+      el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    } else {
+      window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+    }
+  }
+
+  function goToPage(next: number) {
+    setPage(next);
+    window.requestAnimationFrame(() => {
+      scrollBuilderToTop();
+    });
+  }
 
   function persistDraftNow(sel: CompatSelection = selection) {
     saveBuilderDraft({
@@ -718,19 +729,20 @@ export default function ConfiguratorPage() {
     return Boolean(cur && !Array.isArray(cur) && cur.id === part.id);
   }
 
-  /** Mark the current step as skipped when Next is used with nothing chosen. */
+  /** Mark an optional step as skipped when Next is used with nothing chosen. */
   function ensureStepChoice(sel: CompatSelection): CompatSelection {
-    if (currentCat === "PSU") return sel;
-    if (currentCat === "GPU" && !sel.GPU) {
-      return { ...sel, GPU: createNonePart("GPU") };
+    if (currentCat === "CPU" || currentCat === "MOTHERBOARD" || currentCat === "CASE") {
+      return sel;
     }
-    if (isStepComplete(sel, currentCat)) return sel;
-    const none = createNonePart(currentCat);
+    if (stepHasNone(sel, currentCat)) return sel;
     if (currentCat === "SSD") {
-      return { ...sel, SSD: [none] };
+      if (getSsds(sel).length > 0) return sel;
+      return { ...sel, SSD: [createNonePart("SSD")] };
     }
+    const current = sel[currentCat];
+    if (current && !Array.isArray(current)) return sel;
     return pruneIncompatibleSelection(
-      { ...sel, [currentCat]: none } as CompatSelection,
+      { ...sel, [currentCat]: createNonePart(currentCat) } as CompatSelection,
       currentCat,
     );
   }
@@ -926,17 +938,50 @@ export default function ConfiguratorPage() {
     selection.GPU && !isNonePart(selection.GPU) ? (selection.GPU as Part) : null;
   const selectedCpu =
     selection.CPU && !isNonePart(selection.CPU) ? (selection.CPU as Part) : null;
+  const selectedCooler =
+    selection.COOLER && !isNonePart(selection.COOLER) ? selection.COOLER : null;
   const needsToRun = (
     [
       !selectedRam ? "ram" : null,
       selectedGpu || cpuHasIntegratedGraphics(selectedCpu) ? null : "gpu",
+      !hasRealPsu(selection) ? "psu" : null,
+      cpuNeedsCooler(selectedCpu) && !selectedCooler ? "cooler" : null,
       !selectedSsd ? "ssd" : null,
     ] as const
-  ).filter((item): item is "ram" | "gpu" | "ssd" => item !== null);
+  ).filter((item): item is "ram" | "gpu" | "ssd" | "psu" | "cooler" => item !== null);
+  const bringOwnKey = {
+    ram: "builder.bringOwnRam",
+    gpu: "builder.bringOwnGpu",
+    psu: "builder.bringOwnPsu",
+    cooler: "builder.bringOwnCooler",
+    ssd: "builder.bringOwnSsd",
+  } as const;
+  const bringOwnStep = {
+    ram: "RAM",
+    gpu: "GPU",
+    psu: "PSU",
+    cooler: "COOLER",
+    ssd: "SSD",
+  } as const;
+  const coreReady =
+    isStepComplete(selection, "CPU") &&
+    isStepComplete(selection, "MOTHERBOARD") &&
+    isStepComplete(selection, "CASE");
+  const bringOwnNotes = needsToRun
+    .filter((item) => {
+      const cat = bringOwnStep[item];
+      const idx = BUILDER_STEPS.indexOf(cat);
+      return (
+        coreReady ||
+        step > idx ||
+        stepHasNone(selection, cat) ||
+        (item === "ssd" && ssdIsNone(selection))
+      );
+    })
+    .map((item) => bringOwnKey[item]);
   const isFirstStep = step <= 0;
   const isLastStep = step >= BUILDER_STEPS.length - 1;
   const canClear = selectionHasChoice(selection);
-  const psuBlocksNext = currentCat === "PSU" && !hasRealPsu(selection);
   const nextDisabled = isLastStep && !canBuySelection(ensureStepChoice(selection));
 
   async function submitOrder(data: {
@@ -1219,6 +1264,17 @@ export default function ConfiguratorPage() {
               </div>
               <p className="text-xs text-[var(--text-muted)]">{t("builder.cod")}</p>
             </div>
+            {!coreReady ? (
+              <p className="mt-3 text-xs text-[var(--warn)]">{t("builder.coreRequired")}</p>
+            ) : needsToRun.length > 0 ? (
+              <ul className="mt-3 space-y-1 text-xs text-[var(--warn)]">
+                {needsToRun.includes("ram") ? <li>{t("checkout.needsRam")}</li> : null}
+                {needsToRun.includes("gpu") ? <li>{t("checkout.needsGpu")}</li> : null}
+                {needsToRun.includes("psu") ? <li>{t("checkout.needsPsu")}</li> : null}
+                {needsToRun.includes("cooler") ? <li>{t("checkout.needsCooler")}</li> : null}
+                {needsToRun.includes("ssd") ? <li>{t("checkout.needsSsd")}</li> : null}
+              </ul>
+            ) : null}
             <button
               disabled={!requiredReady || blocked}
               onClick={() => {
@@ -1251,20 +1307,11 @@ export default function ConfiguratorPage() {
                 ))}
               </ul>
             )}
-            {((Boolean(selection.GPU && isNonePart(selection.GPU)) &&
-              !cpuHasIntegratedGraphics(selectedCpu)) ||
-              ssdIsNone(selection) ||
-              (!selectedSsd && step >= BUILDER_STEPS.indexOf("SSD"))) && (
+            {bringOwnNotes.length > 0 && (
               <ul className="mt-2 space-y-2 text-sm text-[var(--warn)]">
-                {selection.GPU &&
-                isNonePart(selection.GPU) &&
-                !cpuHasIntegratedGraphics(selectedCpu) ? (
-                  <li>{t("builder.bringOwnGpu")}</li>
-                ) : null}
-                {ssdIsNone(selection) ||
-                (!selectedSsd && step >= BUILDER_STEPS.indexOf("SSD")) ? (
-                  <li>{t("builder.bringOwnSsd")}</li>
-                ) : null}
+                {bringOwnNotes.map((key) => (
+                  <li key={key}>{t(key)}</li>
+                ))}
               </ul>
             )}
             {slotWarning && (
@@ -1331,12 +1378,10 @@ export default function ConfiguratorPage() {
           {currentCat === "COOLER" && selection.CPU && cpuNeedsCooler(selection.CPU) && (
             <p className="mt-2 text-xs text-[var(--warn)]">{t("builder.coolerRequiredHint")}</p>
           )}
-          {psuBlocksNext && (
-            <p className="mt-2 text-xs text-[var(--warn)]">{t("builder.psuRequired")}</p>
-          )}
-          {!hasRealPsu(selection) && step > BUILDER_STEPS.indexOf("PSU") && (
-            <p className="mt-2 text-xs text-[var(--warn)]">{t("builder.psuRequired")}</p>
-          )}
+          {(currentCat === "CPU" || currentCat === "MOTHERBOARD" || currentCat === "CASE") &&
+            !isStepComplete(selection, currentCat) && (
+              <p className="mt-2 text-xs text-[var(--warn)]">{t("builder.coreRequired")}</p>
+            )}
           {currentCat === "COOLER" && selection.CPU && !cpuNeedsCooler(selection.CPU) && (
             <p className="mt-2 text-xs text-[var(--mint)]">{t("builder.coolerIncludedHint")}</p>
           )}
@@ -1520,7 +1565,7 @@ export default function ConfiguratorPage() {
               <button
                 type="button"
                 disabled={safePage <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                onClick={() => goToPage(Math.max(1, safePage - 1))}
                 className="shrink-0 rounded-lg px-2 py-1.5 text-xs text-[var(--text-muted)] disabled:opacity-30 hover:text-[var(--text)]"
               >
                 ‹
@@ -1529,7 +1574,7 @@ export default function ConfiguratorPage() {
                 <button
                   key={n}
                   type="button"
-                  onClick={() => setPage(n)}
+                  onClick={() => goToPage(n)}
                   className={`min-w-7 shrink-0 rounded-lg px-2 py-1.5 text-xs font-medium transition ${
                     n === safePage
                       ? "bg-[var(--cyan)] text-[#041018]"
@@ -1542,7 +1587,7 @@ export default function ConfiguratorPage() {
               <button
                 type="button"
                 disabled={safePage >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                onClick={() => goToPage(Math.min(totalPages, safePage + 1))}
                 className="shrink-0 rounded-lg px-2 py-1.5 text-xs text-[var(--text-muted)] disabled:opacity-30 hover:text-[var(--text)]"
               >
                 ›
