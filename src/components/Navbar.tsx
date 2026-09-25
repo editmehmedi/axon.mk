@@ -24,9 +24,9 @@ export function Navbar() {
     { href: "/prebuilts", label: t("nav.prebuilts") },
     { href: "/configurator", label: t("nav.configurator") },
     { href: "/ai-build", label: t("nav.ai") },
+    { href: "/used", label: t("nav.used") },
     { href: "/used-parts", label: t("nav.usedParts") },
     { href: "/saved", label: t("nav.saved") },
-    { href: "/used", label: t("nav.used") },
     { href: "/orders", label: t("nav.orders") },
     { href: "/sell", label: t("nav.sell") },
   ];
