@@ -40,9 +40,23 @@ export function isShopImageUrl(url: string): boolean {
   return isImagePath(path);
 }
 
-/** Serve shop photos through our proxy so hotlink protection does not hide them. */
+/**
+ * Anhoch and Neptun block axon.mk as a referrer, and Cloudflare blocks the
+ * server from downloading their photos. The browser can load those URLs when
+ * it sends no referrer. Setec and Gjirafa still go through the proxy.
+ */
+function browserLoadsDirectly(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return host.endsWith("anhoch.com") || host.endsWith("neptun.mk");
+  } catch {
+    return false;
+  }
+}
+
+/** Serve shop photos so hotlink protection does not hide them. */
 export function proxiedExternalImage(url: string): string {
-  if (!isShopImageUrl(url)) return url;
+  if (!isShopImageUrl(url) || browserLoadsDirectly(url)) return url;
   return `/api/media/proxy?url=${encodeURIComponent(url)}`;
 }
 

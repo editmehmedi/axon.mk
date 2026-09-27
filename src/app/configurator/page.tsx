@@ -1854,7 +1854,7 @@ export default function ConfiguratorPage() {
         >
           {item.src ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={item.src} alt="" className="h-full w-full object-contain p-1" />
+            <img src={item.src} alt="" referrerPolicy="no-referrer" className="h-full w-full object-contain p-1" />
           ) : (
             <span className="block h-full w-full bg-[rgba(34,211,238,0.25)]" />
           )}

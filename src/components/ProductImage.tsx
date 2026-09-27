@@ -39,6 +39,7 @@ export function ProductImage({ src, alt, ratio = "square", className = "" }: Pro
           src={src}
           alt={alt}
           loading="lazy"
+          referrerPolicy="no-referrer"
           onError={() => setFailed(true)}
           className="absolute inset-0 h-full w-full object-contain p-2 transition duration-300 group-hover:scale-[1.02]"
         />
