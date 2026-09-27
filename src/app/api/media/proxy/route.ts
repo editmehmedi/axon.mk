@@ -1,10 +1,28 @@
 import { NextResponse } from "next/server";
+import { isShopImageUrl } from "@/lib/partImages";
 
-const ALLOWED_HOSTS = new Set(["www.anhoch.com", "anhoch.com"]);
+function parseImageUrl(raw: string): URL | null {
+  try {
+    return new URL(raw);
+  } catch {
+    try {
+      return new URL(encodeURI(raw));
+    } catch {
+      return null;
+    }
+  }
+}
+
+function refererFor(hostname: string): string {
+  if (hostname.endsWith("anhoch.com")) return "https://www.anhoch.com/";
+  if (hostname.endsWith("neptun.mk")) return "https://www.neptun.mk/";
+  if (hostname.includes("digitaloceanspaces.com")) return "https://setec.mk/";
+  if (hostname.endsWith("gjirafamall.tech")) return "https://gjirafa50.mk/";
+  return "https://www.anhoch.com/";
+}
 
 /**
- * Anhoch blocks hotlinking (403 when Referer is not anhoch.com).
- * Proxy their product images so the builder can display them.
+ * Shops block hotlinking. Proxy their product images so the catalog can display them.
  */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -13,19 +31,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Missing url" }, { status: 400 });
   }
 
-  let target: URL;
-  try {
-    target = new URL(raw);
-  } catch {
-    return NextResponse.json({ error: "Invalid url" }, { status: 400 });
-  }
-
-  if (target.protocol !== "https:" || !ALLOWED_HOSTS.has(target.hostname)) {
+  const target = parseImageUrl(raw);
+  if (!target || !isShopImageUrl(target.toString())) {
     return NextResponse.json({ error: "Host not allowed" }, { status: 403 });
-  }
-
-  if (!target.pathname.startsWith("/storage/")) {
-    return NextResponse.json({ error: "Path not allowed" }, { status: 403 });
   }
 
   try {
@@ -33,7 +41,7 @@ export async function GET(req: Request) {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Referer: "https://www.anhoch.com/",
+        Referer: refererFor(target.hostname),
         Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
       },
       next: { revalidate: 60 * 60 * 24 * 7 },
@@ -46,7 +54,10 @@ export async function GET(req: Request) {
       );
     }
 
-    const contentType = upstream.headers.get("content-type") || "image/jpeg";
+    const contentType = upstream.headers.get("content-type") || "";
+    if (!contentType.startsWith("image/")) {
+      return NextResponse.json({ error: "Not an image" }, { status: 502 });
+    }
     const body = await upstream.arrayBuffer();
 
     return new NextResponse(body, {

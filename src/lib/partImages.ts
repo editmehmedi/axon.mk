@@ -8,17 +8,42 @@ type PartLike = {
   imageUrl?: string | null;
 };
 
-/** Anhoch blocks hotlinking — serve their media through our proxy. */
-export function proxiedExternalImage(url: string): string {
+const SHOP_IMAGE_HOSTS = new Set([
+  "www.anhoch.com",
+  "anhoch.com",
+  "setec-pos-web.fra1.cdn.digitaloceanspaces.com",
+  "www.neptun.mk",
+  "neptun.mk",
+  "50cdn.gjirafamall.tech",
+]);
+
+function isImagePath(pathname: string): boolean {
+  return /\.(jpe?g|png|webp|gif|avif)$/i.test(pathname);
+}
+
+/** Shop CDNs that refuse to show a photo when the page is axon.mk. */
+export function isShopImageUrl(url: string): boolean {
+  let parsed: URL;
   try {
-    const u = new URL(url);
-    if (u.hostname === "www.anhoch.com" || u.hostname === "anhoch.com") {
-      return `/api/media/proxy?url=${encodeURIComponent(url)}`;
-    }
+    parsed = new URL(url);
   } catch {
-    /* local path */
+    try {
+      parsed = new URL(encodeURI(url));
+    } catch {
+      return false;
+    }
   }
-  return url;
+  if (parsed.protocol !== "https:" || !SHOP_IMAGE_HOSTS.has(parsed.hostname)) return false;
+  const path = parsed.pathname;
+  if (parsed.hostname.endsWith("anhoch.com")) return path.startsWith("/storage/") && isImagePath(path);
+  if (parsed.hostname === "50cdn.gjirafamall.tech") return path.startsWith("/images/") && isImagePath(path);
+  return isImagePath(path);
+}
+
+/** Serve shop photos through our proxy so hotlink protection does not hide them. */
+export function proxiedExternalImage(url: string): string {
+  if (!isShopImageUrl(url)) return url;
+  return `/api/media/proxy?url=${encodeURIComponent(url)}`;
 }
 
 /** Prefer DB imageUrl, else exact per-item file, else smart fallback. */

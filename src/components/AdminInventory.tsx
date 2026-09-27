@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetSt
 import { formatMkd } from "@/lib/constants";
 import { useI18n } from "@/components/LanguageProvider";
 import { ProductImage } from "@/components/ProductImage";
-import { resolvePartImage } from "@/lib/partImages";
+import { proxiedExternalImage, resolvePartImage } from "@/lib/partImages";
 import { AdminImageField } from "@/components/AdminImageField";
 import {
   checkCompatibility,
@@ -472,7 +472,11 @@ function PrebuiltListRow({
   const outOfStock = p.stock <= 0;
   return (
     <div className={`flex items-center gap-3 px-3 py-2.5 ${!isActive ? "opacity-60" : ""}`}>
-      <ProductImage src={p.imageUrl || ""} alt={p.name} className="!w-12 shrink-0 !rounded-lg" />
+      <ProductImage
+        src={p.imageUrl ? proxiedExternalImage(p.imageUrl) : ""}
+        alt={p.name}
+        className="!w-12 shrink-0 !rounded-lg"
+      />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
           <p className="truncate font-medium">{p.name}</p>
