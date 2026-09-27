@@ -1,14 +1,5 @@
-"use client";
-
-import { PrebuiltCatalog } from "@/components/PrebuiltCatalog";
+import { redirect } from "next/navigation";
 
 export default function UsedPcsPage() {
-  return (
-    <PrebuiltCatalog
-      condition="used"
-      basePath="/used"
-      titleKey="used.title"
-      descKey="used.desc"
-    />
-  );
+  redirect("/prebuilts?condition=used");
 }

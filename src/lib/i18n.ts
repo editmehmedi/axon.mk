@@ -83,7 +83,7 @@ const en: Dict = {
 
   "prebuilts.title": "Pre-Built PCs",
   "prebuilts.desc":
-    "Ready-to-ship, pre-tested desktop systems. Instant Cash-on-Delivery with phone verification.",
+    "New and used ready PCs in one catalog. Filter by condition, then pay on delivery.",
   "prebuilts.created": "Order created: {code}",
   "prebuilts.loading": "Loading...",
   "prebuilts.buyCod": "Buy",
@@ -458,6 +458,11 @@ const en: Dict = {
   "admin.priceHint": "Edit price (MKD) and stock. Update when Anhoch prices change.",
   "admin.supplierNote": "Prices are yours to set. When a supplier changes a price, update it under Inventory.",
   "admin.inventoryHint": "Add, edit, hide, or remove parts. Hidden parts stay in inventory but do not show in Build PC.",
+  "admin.refreshStores": "Refresh stores",
+  "admin.refreshingStores": "Checking stores…",
+  "admin.refreshNone": "Prices, stock, and items already match Anhoch, Setec, Neptun, and Gjirafa.",
+  "admin.refreshDone": "Prices {prices}, stock {stocks}, new {added}, removed {removed}.",
+  "admin.refreshFailed": "Store refresh failed",
   "admin.addPart": "+ Add part",
   "admin.addPartTitle": "New inventory part",
   "admin.savePart": "Save part",
@@ -500,8 +505,8 @@ const en: Dict = {
   "admin.prebuiltDeleteConfirm": "Delete “{name}”? This cannot be undone.",
   "admin.inventoryError": "Inventory update failed",
   "admin.noPartsMatch": "No parts match your search.",
-  "admin.prebuiltsHint": "Add, edit, hide, or remove ready PCs. Hidden PCs stay in inventory but do not show on Pre-Built PCs.",
-  "admin.usedHint": "Add, edit, hide, or remove used PCs. Hidden PCs stay in inventory but do not show on Used PCs.",
+  "admin.prebuiltsHint": "Add, edit, hide, or remove ready PCs. Mark each one New or Used. Hidden PCs stay in inventory but do not show on Pre-Built PCs.",
+  "admin.usedHint": "Add, edit, hide, or remove used PCs. They appear on Pre-Built PCs. Hidden PCs stay in inventory but do not show there.",
   "admin.showingCount": "{count} shown",
   "admin.searchCatalog": "Search…",
   "admin.colCategory": "Category",
@@ -510,7 +515,7 @@ const en: Dict = {
 
   "sell.title": "Sell your PC or parts",
   "sell.desc":
-    "Submit a used PC or component. An admin reviews it — Sell PC goes to Used PCs, parts go to Used Parts.",
+    "Submit a used PC or component. An admin reviews it — Sell PC goes to Pre-Built PCs, parts go to Used Parts.",
   "sell.formTitle": "New listing",
   "sell.formHint": "Listings stay pending until an admin approves them.",
   "sell.loading": "Loading…",
@@ -557,7 +562,7 @@ const en: Dict = {
 
   "admin.listingsTitle": "User sell requests",
   "admin.listingsHint":
-    "Approve listings — Sell PC appears under Used PCs; parts under Used Parts.",
+    "Approve listings — Sell PC appears on Pre-Built PCs; parts under Used Parts.",
   "admin.listingsPending": "Pending",
   "admin.listingsAll": "All",
   "admin.listingsEmpty": "No listings in this view.",
@@ -691,7 +696,7 @@ const sq: Dict = {
 
   "prebuilts.title": "PC të Gatshme",
   "prebuilts.desc":
-    "Sisteme desktop të gatshme dhe të testuara. Porosi COD me verifikim telefoni.",
+    "PC të reja dhe të përdorura në një katalog. Filtro sipas gjendjes, pastaj paguaj në dorëzim.",
   "prebuilts.created": "Porosia u krijua: {code}",
   "prebuilts.loading": "Duke u ngarkuar...",
   "prebuilts.buyCod": "Bli",
@@ -1066,6 +1071,11 @@ const sq: Dict = {
   "admin.priceHint": "Ndrysho çmimin (MKD) dhe stokun. Përditëso kur Anhoch ndryshon çmimet.",
   "admin.supplierNote": "Çmimet i vendos ti. Kur furnitori ndryshon një çmim, përditësoje te Inventory.",
   "admin.inventoryHint": "Shto, ndrysho, fshih ose fshi pjesë. Pjesët e fshehura mbeten në stok por nuk shfaqen te Ndërto Vetë.",
+  "admin.refreshStores": "Rifresko dyqanet",
+  "admin.refreshingStores": "Po kontrollohen dyqanet…",
+  "admin.refreshNone": "Çmimet, stoku dhe artikujt përputhen me Anhoch, Setec, Neptun dhe Gjirafa.",
+  "admin.refreshDone": "Çmime {prices}, stok {stocks}, të reja {added}, të hequra {removed}.",
+  "admin.refreshFailed": "Rifreskimi i dyqaneve dështoi",
   "admin.addPart": "+ Shto pjesë",
   "admin.addPartTitle": "Pjesë e re në stok",
   "admin.savePart": "Ruaj pjesën",
@@ -1108,8 +1118,8 @@ const sq: Dict = {
   "admin.prebuiltDeleteConfirm": "Të fshihet “{name}”? Ky veprim nuk kthehet mbrapsht.",
   "admin.inventoryError": "Përditësimi i stokut dështoi",
   "admin.noPartsMatch": "Asnjë pjesë nuk përputhet.",
-  "admin.prebuiltsHint": "Shto, ndrysho, fshih ose fshi PC të gatshme. PC-të e fshehura mbeten në stok por nuk shfaqen te PC të Gatshme.",
-  "admin.usedHint": "Shto, ndrysho, fshih ose fshi PC të përdorura. PC-të e fshehura mbeten në stok por nuk shfaqen te PC të Përdorura.",
+  "admin.prebuiltsHint": "Shto, ndrysho, fshih ose fshi PC të gatshme. Shëno secilin si të ri ose të përdorur. PC-të e fshehura mbeten në stok por nuk shfaqen te PC të Gatshme.",
+  "admin.usedHint": "Shto, ndrysho, fshih ose fshi PC të përdorura. Ato shfaqen te PC të Gatshme. PC-të e fshehura mbeten në stok por nuk shfaqen atje.",
   "admin.showingCount": "{count} të shfaqura",
   "admin.searchCatalog": "Kërko…",
   "admin.colCategory": "Kategoria",
@@ -1118,7 +1128,7 @@ const sq: Dict = {
 
   "sell.title": "Shit PC ose pjesë",
   "sell.desc":
-    "Dërgo një PC ose komponent të përdorur. Admin e shqyrton — Shit PC shkon te PC të Përdorura, pjesët te Pjesë të Përdorura.",
+    "Dërgo një PC ose komponent të përdorur. Admin e shqyrton — Shit PC shkon te PC të Gatshme, pjesët te Pjesë të Përdorura.",
   "sell.formTitle": "Listim i ri",
   "sell.formHint": "Listimet qëndrojnë në pritje derisa admini t’i aprovojë.",
   "sell.loading": "Duke u ngarkuar…",
@@ -1165,7 +1175,7 @@ const sq: Dict = {
 
   "admin.listingsTitle": "Kërkesat e shitjes nga përdoruesit",
   "admin.listingsHint":
-    "Aprovo listimet — Shit PC shfaqet te PC të Përdorura; pjesët te Pjesë të Përdorura.",
+    "Aprovo listimet — Shit PC shfaqet te PC të Gatshme; pjesët te Pjesë të Përdorura.",
   "admin.listingsPending": "Në pritje",
   "admin.listingsAll": "Të gjitha",
   "admin.listingsEmpty": "Nuk ka listime në këtë pamje.",
@@ -1299,7 +1309,7 @@ const mk: Dict = {
 
   "prebuilts.title": "Готови Конфигурации",
   "prebuilts.desc":
-    "Ready-to-ship, pre-tested desktop системи. Instant Cash-on-Delivery нарачка со верификација преку телефон.",
+    "Нови и полови готови PC во еден каталог. Филтрирај по состојба, па плати при достава.",
   "prebuilts.created": "Нарачката е креирана: {code}",
   "prebuilts.loading": "Се вчитува...",
   "prebuilts.buyCod": "Купи",
@@ -1674,6 +1684,11 @@ const mk: Dict = {
   "admin.priceHint": "Измени цена (MKD) и залиха. Ажурирај кога Anhoch ќе смени цена.",
   "admin.supplierNote": "Цените ги поставуваш ти. Кога добавувач ќе смени цена, ажурирај во Inventory.",
   "admin.inventoryHint": "Додај, измени, сокриј или отстрани делови. Скриените остануваат во залиха, но не се гледаат во Склопи Сам.",
+  "admin.refreshStores": "Освежи продавници",
+  "admin.refreshingStores": "Се проверуваат продавниците…",
+  "admin.refreshNone": "Цените, залихата и артиклите се совпаѓаат со Анхоч, Сетек, Нептун и Гирафа.",
+  "admin.refreshDone": "Цени {prices}, залиха {stocks}, нови {added}, отстранети {removed}.",
+  "admin.refreshFailed": "Освежувањето на продавниците не успеа",
   "admin.addPart": "+ Додај дел",
   "admin.addPartTitle": "Нов дел во залиха",
   "admin.savePart": "Зачувај дел",
@@ -1716,8 +1731,8 @@ const mk: Dict = {
   "admin.prebuiltDeleteConfirm": "Да се избрише „{name}“? Ова не може да се врати.",
   "admin.inventoryError": "Ажурирањето на залихата не успеа",
   "admin.noPartsMatch": "Нема делови според пребарувањето.",
-  "admin.prebuiltsHint": "Додај, измени, сокриј или отстрани готови PC. Скриените остануваат во залиха, но не се гледаат на Pre-Built PCs.",
-  "admin.usedHint": "Додај, измени, сокриј или отстрани користени PC. Скриените остануваат во залиха, но не се гледаат на Used PCs.",
+  "admin.prebuiltsHint": "Додај, измени, сокриј или отстрани готови PC. Означи го секој како нов или користен. Скриените остануваат во залиха, но не се гледаат на Pre-Built PCs.",
+  "admin.usedHint": "Додај, измени, сокриј или отстрани користени PC. Тие се појавуваат кај Готови Конфигурации. Скриените остануваат во залиха, но не се гледаат таму.",
   "admin.showingCount": "{count} прикажани",
   "admin.searchCatalog": "Пребарај…",
   "admin.colCategory": "Категорија",
@@ -1726,7 +1741,7 @@ const mk: Dict = {
 
   "sell.title": "Продај PC или делови",
   "sell.desc":
-    "Поднеси половен PC или компонента. Админ ја прегледува — Продај PC оди на Половен PC, деловите на Половни делови.",
+    "Поднеси половен PC или компонента. Админ ја прегледува — Продај PC оди на Готови Конфигурации, деловите на Половни делови.",
   "sell.formTitle": "Нова објава",
   "sell.formHint": "Објавите чекаат одобрување од админ пред да станат јавни.",
   "sell.loading": "Се вчитува…",
@@ -1773,7 +1788,7 @@ const mk: Dict = {
 
   "admin.listingsTitle": "Барања за продажба од корисници",
   "admin.listingsHint":
-    "Одобри објави — Продај PC оди на Половен PC; деловите на Половни делови.",
+    "Одобри објави — Продај PC оди на Готови Конфигурации; деловите на Половни делови.",
   "admin.listingsPending": "На чекање",
   "admin.listingsAll": "Сите",
   "admin.listingsEmpty": "Нема објави во овој преглед.",

@@ -69,11 +69,13 @@ type CsvRow = {
   source: string;
 };
 
-/** Parse in_stock from Anhoch (col3) or Setec/Gjirafa/Neptun (col4). */
+/** Parse in_stock from Anhoch (col3) or Setec/Gjirafa/Neptun (col4). A number is an exact qty. */
 function stockFromCsvCols(cols: string[], defaultStock: number): number {
   const candidates = [cols[4], cols[3], cols[cols.length - 1]];
   for (const c of candidates) {
-    const v = (c ?? "").trim().toLowerCase();
+    const raw = (c ?? "").trim();
+    const v = raw.toLowerCase();
+    if (/^\d+$/.test(raw)) return Number(raw);
     if (v === "yes" || v === "да" || v === "da") return defaultStock;
     if (v === "no" || v === "не" || v === "ne") return 0;
   }

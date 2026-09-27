@@ -14,7 +14,7 @@ export const LISTING_CATEGORIES = [
 
 export type ListingCategory = (typeof LISTING_CATEGORIES)[number];
 
-/** Parts only — full PCs appear under /used, not /used-parts. */
+/** Parts only — full PCs appear on Pre-Built PCs, not /used-parts. */
 export const PART_LISTING_CATEGORIES = LISTING_CATEGORIES.filter(
   (c) => c !== "PC",
 ) as Exclude<ListingCategory, "PC">[];

@@ -1,4 +1,5 @@
 import { identifyCpu, identifyGpu } from "@/lib/chipCatalog";
+import { displayPartValue } from "@/lib/prebuiltSpecs";
 import {
   checkCompatibility,
   clampRamQty,
@@ -76,9 +77,10 @@ export function describeReadyPc(pc: {
   ramLabel: string;
   ssdLabel: string;
 }): string {
-  const cpu = pc.cpuLabel.replace(/\s*\([^)]*\)\s*$/, "").trim();
-  const gpu = /integrated/i.test(pc.gpuLabel) ? "integrated graphics" : pc.gpuLabel.trim();
-  return `Ready PC with ${cpu}, ${gpu}, ${pc.ramLabel.trim()} and ${pc.ssdLabel.trim()}. Built and tested, with warranty. Cash on delivery in North Macedonia.`;
+  const cpu = displayPartValue(pc.cpuLabel).replace(/\s*\([^)]*\)\s*$/, "").trim();
+  const gpuLabel = displayPartValue(pc.gpuLabel);
+  const gpu = /integrated/i.test(gpuLabel) ? "integrated graphics" : gpuLabel;
+  return `Ready PC with ${cpu}, ${gpu}, ${displayPartValue(pc.ramLabel)} and ${displayPartValue(pc.ssdLabel)}. Built and tested, with warranty. Cash on delivery in North Macedonia.`;
 }
 
 function ramSpeedMhz(name: string): number {

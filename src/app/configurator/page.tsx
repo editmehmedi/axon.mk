@@ -48,6 +48,7 @@ import { useCurrency } from "@/components/CurrencyProvider";
 import { PartFilters, type PartFilterState } from "@/components/PartFilters";
 import { ProductImage } from "@/components/ProductImage";
 import { inferListingGpuTdp } from "@/lib/listingPower";
+import { inferListingPartSpecs } from "@/lib/listingSpecs";
 import { selectionFromPrebuiltLabels, type PrebuiltPartLabels } from "@/lib/prebuiltEdit";
 import { resolvePartImage } from "@/lib/partImages";
 import { fetchSessionUser, loginUrl } from "@/lib/clientAuth";
@@ -333,8 +334,10 @@ export default function ConfiguratorPage() {
               priceMkd: number;
               imageUrl: string | null;
               sellerName: string;
-            }) =>
-              ({
+              description?: string | null;
+            }) => {
+              const specs = inferListingPartSpecs(l.category, l.name, l.description ?? "");
+              return {
                 id: `listing:${l.id}`,
                 name: l.name,
                 brand: l.category === "GPU" ? "Used" : l.sellerName || "Used",
@@ -342,14 +345,15 @@ export default function ConfiguratorPage() {
                 priceMkd: l.priceMkd,
                 stock: 1,
                 imageUrl: l.imageUrl,
-                socket: null,
-                ramType: null,
+                socket: specs.socket,
+                ramType: specs.ramType,
                 wattage: null,
                 tdpWatts: l.category === "GPU" ? inferListingGpuTdp(l.name) : null,
-                formFactor: null,
+                formFactor: specs.formFactor,
                 source: "used" as const,
                 warrantyMonths: 3,
-              }) satisfies Part,
+              } satisfies Part;
+            },
           );
         setUsedParts(items);
       })

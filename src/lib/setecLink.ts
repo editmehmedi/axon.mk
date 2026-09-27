@@ -32,6 +32,65 @@ function productUrl(handle: string): string | null {
   return `https://setec.mk/products/${slug}`;
 }
 
+type SetecCatalogHit = {
+  title?: string;
+  thumbnail?: string;
+  total_web_quantity?: number;
+  variants?: { calculated_price?: { calculated_amount?: number; original_amount?: number } }[];
+};
+
+/** Every published Setec product in one category, with the web price and quantity. */
+export async function listSetecCategory(categoryName: string): Promise<
+  { title: string; thumbnail: string; priceMkd: number; quantity: number }[]
+> {
+  const rows: { title: string; thumbnail: string; priceMkd: number; quantity: number }[] = [];
+  let page = 1;
+  let total = Infinity;
+  while ((page - 1) * 100 < total && page <= 20) {
+    const res = await fetch(SEARCH_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SEARCH_API_KEY}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        q: "",
+        hitsPerPage: 100,
+        page,
+        filter: `status = 'published' AND is_web_active = 'true' AND product_categories.name = '${categoryName.replace(/'/g, "\\'")}'`,
+        attributesToRetrieve: ["title", "thumbnail", "total_web_quantity", "variants"],
+      }),
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`Setec ${categoryName} HTTP ${res.status}`);
+    const data = (await res.json()) as {
+      hits?: SetecCatalogHit[];
+      estimatedTotalHits?: number;
+      totalHits?: number;
+    };
+    total = data.estimatedTotalHits ?? data.totalHits ?? 0;
+    if (total > 800) throw new Error(`Setec ${categoryName} listing looks unfiltered`);
+    const hits = data.hits ?? [];
+    if (!hits.length) break;
+    for (const hit of hits) {
+      const price = hit.variants?.[0]?.calculated_price;
+      const priceMkd = Math.round(price?.calculated_amount ?? price?.original_amount ?? 0);
+      const title = hit.title?.trim() ?? "";
+      if (!title || priceMkd <= 0) continue;
+      rows.push({
+        title,
+        thumbnail: hit.thumbnail?.trim() ?? "",
+        priceMkd,
+        quantity: Math.max(0, Math.round(hit.total_web_quantity ?? 0)),
+      });
+    }
+    page += 1;
+  }
+  if (!rows.length) throw new Error(`Setec ${categoryName} returned no products`);
+  return rows;
+}
+
 /** Setec product page for a part name, or the Setec search page if none matches. */
 export async function findSetecProductUrl(label: string): Promise<string> {
   const query = setecSearchQuery(label);

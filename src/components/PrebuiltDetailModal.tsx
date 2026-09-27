@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { resolvePrebuiltImage } from "@/lib/partImages";
-import { getPrebuiltSpecs } from "@/lib/prebuiltSpecs";
+import { displayPartValue, getPrebuiltSpecs } from "@/lib/prebuiltSpecs";
 import { ProductImage } from "./ProductImage";
 import { useI18n } from "./LanguageProvider";
 import { useCurrency } from "./CurrencyProvider";
@@ -114,13 +114,26 @@ export function PrebuiltDetailModal({ pc, open, onClose, onBuy }: Props) {
             {specs.map((row) => (
               <div
                 key={row.key}
-                className="rounded-xl bg-[rgba(7,11,18,0.45)] px-3.5 py-3"
+                className={
+                  row.used
+                    ? "rounded-xl border border-[rgba(250,204,21,0.45)] bg-[rgba(250,204,21,0.12)] px-3.5 py-3"
+                    : "rounded-xl bg-[rgba(7,11,18,0.45)] px-3.5 py-3"
+                }
               >
-                <dt className="text-[11px] uppercase tracking-wider text-[var(--cyan-dim)]">
+                <dt
+                  className={`text-[11px] uppercase tracking-wider ${
+                    row.used ? "text-[#facc15]" : "text-[var(--cyan-dim)]"
+                  }`}
+                >
                   {row.label}
                 </dt>
-                <dd className="mt-1 text-sm font-medium text-[var(--text)]">
-                  {row.value}
+                <dd className={`mt-1 text-sm font-medium ${row.used ? "text-[#fde68a]" : "text-[var(--text)]"}`}>
+                  {row.used ? (
+                    <span className="mr-1.5 inline-block rounded bg-[#facc15] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#1c1400]">
+                      {t("used.badge")}
+                    </span>
+                  ) : null}
+                  {row.used ? ` ${displayPartValue(row.value)}` : row.value}
                 </dd>
               </div>
             ))}

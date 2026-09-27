@@ -193,11 +193,15 @@ export function loadAnhochCpus(csvPath: string): AnhochCpuPart[] {
     const { brand, name, socket, includesCooler } = parseCpuName(rawName);
     if (brand === "Unknown") continue;
 
-    const inStockFlag = [cols[4], cols[3], cols[cols.length - 1]]
-      .map((c) => (c ?? "").trim().toLowerCase())
-      .find((v) => v === "yes" || v === "no" || v === "да" || v === "не" || v === "da" || v === "ne");
-    const stock =
-      inStockFlag === "no" || inStockFlag === "не" || inStockFlag === "ne" ? 0 : 8;
+    const stockCell = [cols[4], cols[3], cols[cols.length - 1]]
+      .map((c) => (c ?? "").trim())
+      .find((v) => /^\d+$/.test(v) || /^(yes|no|да|не|da|ne)$/i.test(v));
+    const stockFlag = stockCell?.toLowerCase();
+    const stock = /^\d+$/.test(stockCell ?? "")
+      ? Number(stockCell)
+      : stockFlag === "no" || stockFlag === "не" || stockFlag === "ne"
+        ? 0
+        : 8;
 
     parts.push({
       name,

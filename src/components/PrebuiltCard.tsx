@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { resolvePrebuiltImage } from "@/lib/partImages";
+import { displayPartValue, isUsedPartLabel } from "@/lib/prebuiltSpecs";
 import { ProductImage } from "./ProductImage";
 import { useI18n } from "./LanguageProvider";
 import { useCurrency } from "./CurrencyProvider";
@@ -25,10 +26,41 @@ export type PrebuiltCardData = {
   imageUrl?: string | null;
   condition?: string | null;
   conditionGrade?: string | null;
-  /** Community sell listing (category PC) — shown on /used */
+  /** Community sell listing (category PC) — shown on Pre-Built PCs */
   listingId?: string | null;
   sellerName?: string | null;
 };
+
+function PrebuiltSpec({
+  label,
+  value,
+  used,
+}: {
+  label: string;
+  value: string;
+  used: boolean;
+}) {
+  const { t } = useI18n();
+  return (
+    <div
+      className={
+        used
+          ? "rounded-lg border border-[rgba(250,204,21,0.45)] bg-[rgba(250,204,21,0.12)] px-2.5 py-2"
+          : "rounded-lg bg-[rgba(7,11,18,0.45)] px-2.5 py-2"
+      }
+    >
+      <dt className={used ? "text-[#facc15]" : "text-[var(--cyan-dim)]"}>{label}</dt>
+      <dd className={`mt-0.5 font-medium ${used ? "text-[#fde68a]" : "text-[var(--text)]"}`}>
+        {used ? (
+          <span className="mr-1.5 inline-block rounded bg-[#facc15] px-1.5 py-0.5 align-middle text-[10px] font-semibold uppercase tracking-wide text-[#1c1400]">
+            {t("used.badge")}
+          </span>
+        ) : null}
+        {used ? ` ${displayPartValue(value)}` : value}
+      </dd>
+    </div>
+  );
+}
 
 export function PrebuiltCard({
   pc,
@@ -95,19 +127,23 @@ export function PrebuiltCard({
         </div>
 
         <dl className="grid grid-cols-2 gap-2 text-xs">
-          {[
-            ["CPU", pc.cpuLabel],
-            ["GPU", pc.gpuLabel],
-            ["RAM", pc.ramLabel],
-            ["SSD", pc.ssdLabel],
-          ]
+          {(
+            [
+              ["CPU", pc.cpuLabel],
+              ["GPU", pc.gpuLabel],
+              ["RAM", pc.ramLabel],
+              ["SSD", pc.ssdLabel],
+            ] as const
+          )
             .filter(([, v]) => Boolean(v?.trim()))
             .map(([k, v]) => (
-            <div key={k} className="rounded-lg bg-[rgba(7,11,18,0.45)] px-2.5 py-2">
-              <dt className="text-[var(--cyan-dim)]">{k}</dt>
-              <dd className="mt-0.5 font-medium text-[var(--text)]">{v}</dd>
-            </div>
-          ))}
+              <PrebuiltSpec
+                key={k}
+                label={k}
+                value={v}
+                used={pc.condition === "used" || isUsedPartLabel(v)}
+              />
+            ))}
         </dl>
 
         {pc.sellerName ? (

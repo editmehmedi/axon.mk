@@ -46,13 +46,13 @@ function matchesSearch(pc: PrebuiltCardData, q: string): boolean {
   return hay.includes(q);
 }
 
+type ConditionFilter = "all" | "new" | "used";
+
 function CatalogInner({
-  condition,
   basePath,
   titleKey,
   descKey,
 }: {
-  condition: "new" | "used";
   basePath: string;
   titleKey: string;
   descKey: string;
@@ -66,19 +66,18 @@ function CatalogInner({
   const router = useRouter();
   const params = useSearchParams();
 
+  const conditionParam = params.get("condition");
+  const condition: ConditionFilter =
+    conditionParam === "new" || conditionParam === "used" ? conditionParam : "all";
+
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const storeRes = await fetch(`/api/prebuilts?condition=${condition}`);
+      const storeRes = await fetch("/api/prebuilts");
       const storeData = await storeRes.json();
       const storeItems: PrebuiltCardData[] = storeData.items ?? [];
 
-      if (condition !== "used") {
-        if (!cancelled) setItems(storeItems);
-        return;
-      }
-
-      // Community "Sell PC" listings appear on Used PCs after admin approval
+      // Community "Sell PC" listings appear with used prebuilts after admin approval
       try {
         const listRes = await fetch("/api/sell?category=PC");
         const listData = await listRes.json();
@@ -130,7 +129,7 @@ function CatalogInner({
     return () => {
       cancelled = true;
     };
-  }, [condition]);
+  }, []);
 
   const priceBounds = useMemo(() => {
     if (!items.length) return { min: 0, max: 0 };
@@ -156,22 +155,34 @@ function CatalogInner({
   }, [items]);
 
   const filtered = useMemo(() => {
-    if (!filters) return items;
-    const q = filters.search.trim().toLowerCase();
+    const q = filters?.search.trim().toLowerCase() ?? "";
     let list = items.filter((pc) => {
+      const isUsed = pc.condition === "used" || !!pc.listingId;
+      if (condition === "new" && isUsed) return false;
+      if (condition === "used" && !isUsed) return false;
+      if (!filters) return true;
       if (!matchesSearch(pc, q)) return false;
       if (filters.brand && gpuBrand(pc) !== filters.brand) return false;
       if (filters.ramType && ramTypeOf(pc) !== filters.ramType) return false;
       if (pc.priceMkd < filters.priceMin || pc.priceMkd > filters.priceMax) return false;
       return true;
     });
+    const sort = filters?.sort ?? "price-asc";
     list = [...list].sort((a, b) => {
-      if (filters.sort === "name") return a.name.localeCompare(b.name);
-      if (filters.sort === "price-desc") return b.priceMkd - a.priceMkd;
+      if (sort === "name") return a.name.localeCompare(b.name);
+      if (sort === "price-desc") return b.priceMkd - a.priceMkd;
       return a.priceMkd - b.priceMkd;
     });
     return list;
-  }, [items, filters]);
+  }, [items, filters, condition]);
+
+  function setCondition(next: ConditionFilter) {
+    const q = new URLSearchParams(params.toString());
+    if (next === "all") q.delete("condition");
+    else q.set("condition", next);
+    const qs = q.toString();
+    router.replace(qs ? `${basePath}?${qs}` : basePath, { scroll: false });
+  }
 
   useEffect(() => {
     const buy = params.get("buy");
@@ -265,6 +276,29 @@ function CatalogInner({
       <div className="mb-8">
         <h1 className="section-title text-3xl md:text-4xl">{t(titleKey)}</h1>
         <p className="mt-2 max-w-2xl text-[var(--text-muted)]">{t(descKey)}</p>
+        <div className="mt-4 flex flex-wrap gap-1.5" role="group" aria-label={t("used.condition")}>
+          {(
+            [
+              ["all", t("builder.filterAll")],
+              ["new", t("builder.conditionNew")],
+              ["used", t("builder.conditionUsed")],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={condition === id}
+              onClick={() => setCondition(id)}
+              className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                condition === id
+                  ? "bg-[var(--cyan)] text-[#041018]"
+                  : "bg-[rgba(34,211,238,0.08)] text-[var(--text-muted)] hover:text-[var(--text)]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {success && (
@@ -332,12 +366,10 @@ function CatalogInner({
 }
 
 export function PrebuiltCatalog({
-  condition,
   basePath,
   titleKey,
   descKey,
 }: {
-  condition: "new" | "used";
   basePath: string;
   titleKey: string;
   descKey: string;
@@ -345,12 +377,7 @@ export function PrebuiltCatalog({
   const { t } = useI18n();
   return (
     <Suspense fallback={<div className="p-10 text-[var(--text-muted)]">{t("prebuilts.loading")}</div>}>
-      <CatalogInner
-        condition={condition}
-        basePath={basePath}
-        titleKey={titleKey}
-        descKey={descKey}
-      />
+      <CatalogInner basePath={basePath} titleKey={titleKey} descKey={descKey} />
     </Suspense>
   );
 }

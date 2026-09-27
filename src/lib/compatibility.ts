@@ -1,3 +1,5 @@
+import { inferDdrGeneration, inferListingPartSpecs } from "@/lib/listingSpecs";
+
 export type CompatPart = {
   id: string;
   category: string;
@@ -458,6 +460,26 @@ export function estimatedPsuWatts(sel: CompatSelection, qty?: PowerQty): number 
   return Math.ceil((estimatedUsageWatts(sel, qty) || 150) * 1.25);
 }
 
+/** RAM generation from the stored field, or from the title / chipset when that field is empty. */
+export function resolvedRamType(part: CompatPart): string | null {
+  const named = inferDdrGeneration(part.name ?? "");
+  if (named) return named;
+  const stored = part.ramType?.trim().toUpperCase();
+  if (stored) return stored;
+  if (part.category === "MOTHERBOARD") return inferListingPartSpecs("MOTHERBOARD", part.name ?? "").ramType;
+  return null;
+}
+
+/** Socket from the stored field, or from a used-listing title when that field is empty. */
+export function resolvedSocket(part: CompatPart): string | null {
+  const stored = part.socket?.trim().toUpperCase().replace(/\s+/g, "");
+  if (stored) return stored;
+  if (part.category === "MOTHERBOARD" || part.category === "CPU") {
+    return inferListingPartSpecs(part.category, part.name ?? "").socket;
+  }
+  return null;
+}
+
 /** Expected RAM generation(s) for a CPU socket when no motherboard is picked yet. */
 export function ramTypesForCpuSocket(socket?: string | null): string[] | null {
   if (!socket) return null;
@@ -484,25 +506,35 @@ export function isCompatibleOption(
   const ram = sel.RAM && !isNonePart(sel.RAM) ? sel.RAM : null;
 
   if (category === "MOTHERBOARD") {
-    if (cpu?.socket && part.socket && part.socket !== cpu.socket) return false;
-    if (ram?.ramType && part.ramType && part.ramType !== ram.ramType) return false;
+    const cpuSocket = cpu ? resolvedSocket(cpu) : null;
+    const boardSocket = resolvedSocket(part);
+    if (cpuSocket && boardSocket && boardSocket !== cpuSocket) return false;
+    const stickType = ram ? resolvedRamType(ram) : null;
+    const boardType = resolvedRamType(part);
+    if (stickType && boardType && boardType !== stickType) return false;
   }
 
   if (category === "CPU") {
-    if (mb?.socket && part.socket && part.socket !== mb.socket) return false;
-    if (ram?.ramType && part.socket) {
-      const allowed = ramTypesForCpuSocket(part.socket);
-      if (allowed && !allowed.includes(ram.ramType)) return false;
+    const boardSocket = mb ? resolvedSocket(mb) : null;
+    const cpuSocket = resolvedSocket(part);
+    if (boardSocket && cpuSocket && cpuSocket !== boardSocket) return false;
+    const stickType = ram ? resolvedRamType(ram) : null;
+    if (stickType && cpuSocket) {
+      const allowed = ramTypesForCpuSocket(cpuSocket);
+      if (allowed && !allowed.includes(stickType)) return false;
     }
   }
 
   if (category === "RAM") {
+    const boardType = mb ? resolvedRamType(mb) : null;
+    const stickType = resolvedRamType(part);
     // Motherboard wins when present (exact DDR4/DDR5).
-    if (mb?.ramType && part.ramType && part.ramType !== mb.ramType) return false;
+    if (boardType && stickType && stickType !== boardType) return false;
     // With only a CPU picked (e.g. AM4 5600X), hide incompatible RAM generations.
-    if (!mb?.ramType && cpu?.socket && part.ramType) {
-      const allowed = ramTypesForCpuSocket(cpu.socket);
-      if (allowed && !allowed.includes(part.ramType)) return false;
+    const socket = mb ? resolvedSocket(mb) : cpu ? resolvedSocket(cpu) : null;
+    if (!boardType && socket && stickType) {
+      const allowed = ramTypesForCpuSocket(socket);
+      if (allowed && !allowed.includes(stickType)) return false;
     }
   }
 
@@ -639,12 +671,13 @@ export function compatibilityFilterHint(sel: CompatSelection, category: string):
   if (category === "MOTHERBOARD" && cpu?.socket) {
     return `socket ${cpu.socket}`;
   }
-  if (category === "RAM" && mb?.ramType) {
+  if (category === "RAM" && mb) {
+    const boardType = resolvedRamType(mb);
     const slots = motherboardRamSlots(mb);
-    return slots ? `${mb.ramType} · ${slots} DIMM` : mb.ramType;
+    if (boardType) return slots ? `${boardType} · ${slots} DIMM` : boardType;
   }
-  if (category === "RAM" && !mb?.ramType && cpu?.socket) {
-    const allowed = ramTypesForCpuSocket(cpu.socket);
+  if (category === "RAM" && cpu?.socket && !(mb && resolvedRamType(mb))) {
+    const allowed = ramTypesForCpuSocket(resolvedSocket(cpu) ?? cpu.socket);
     if (allowed?.length === 1) return allowed[0];
     if (allowed?.length) return allowed.join(" / ");
   }
@@ -740,21 +773,25 @@ export function checkCompatibility(
     }
   }
 
-  if (cpu && ram && ram.ramType) {
-    const allowed = ramTypesForCpuSocket(cpu.socket);
-    if (allowed && !allowed.includes(ram.ramType)) {
+  if (cpu && ram) {
+    const stickType = resolvedRamType(ram);
+    const cpuSocket = resolvedSocket(cpu);
+    const allowed = ramTypesForCpuSocket(cpuSocket);
+    if (stickType && allowed && !allowed.includes(stickType)) {
       issues.push({
         severity: "error",
-        message: `RAM type mismatch: CPU (${cpu.socket ?? "unknown"}) needs ${allowed.join("/")} ↔ RAM (${ram.ramType})`,
+        message: `RAM type mismatch: CPU (${cpuSocket ?? "unknown"}) needs ${allowed.join("/")} ↔ RAM (${stickType})`,
       });
     }
   }
 
   if (mb && ram) {
-    if (mb.ramType && ram.ramType && mb.ramType !== ram.ramType) {
+    const boardType = resolvedRamType(mb);
+    const stickType = resolvedRamType(ram);
+    if (boardType && stickType && boardType !== stickType) {
       issues.push({
         severity: "error",
-        message: `RAM type mismatch: Motherboard (${mb.ramType}) ↔ RAM (${ram.ramType})`,
+        message: `RAM type mismatch: Motherboard (${boardType}) ↔ RAM (${stickType})`,
       });
     }
   }

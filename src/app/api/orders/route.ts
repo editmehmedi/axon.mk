@@ -14,6 +14,7 @@ import {
 import { generateTrackingCode, BUILDER_STEPS } from "@/lib/constants";
 import { sendAdminNewOrderEmail, sendOrderConfirmationEmail } from "@/lib/email";
 import { ORDER_NOTE } from "@/lib/orderNotes";
+import { inferListingPartSpecs } from "@/lib/listingSpecs";
 
 function normalizeListingId(id: string) {
   return id.startsWith("listing:") ? id.slice("listing:".length) : id;
@@ -272,12 +273,16 @@ export async function POST(req: Request) {
             { status: 400 },
           );
         }
+        const specs = inferListingPartSpecs(l.category, l.name, l.description ?? "");
         const item: SelItem = {
           id: l.id,
           category: l.category,
           name: l.name,
           brand: "Used",
           priceMkd: l.priceMkd,
+          socket: specs.socket,
+          ramType: specs.ramType,
+          formFactor: specs.formFactor,
           kind: "listing",
         };
         lineItems.push(item);

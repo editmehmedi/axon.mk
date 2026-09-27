@@ -189,7 +189,7 @@ export function SellMarketplace() {
           <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">{t("sell.desc")}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/used" className="btn btn-ghost !text-sm">
+          <Link href="/prebuilts?condition=used" className="btn btn-ghost !text-sm">
             {t("sell.browseUsedPcs")}
           </Link>
           <Link href="/used-parts" className="btn btn-ghost !text-sm">

@@ -2,14 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { PrebuiltCard, type PrebuiltCardData } from "@/components/PrebuiltCard";
 import { useI18n } from "@/components/LanguageProvider";
 
 export function HomeView({ prebuilts }: { prebuilts: PrebuiltCardData[] }) {
   const { t } = useI18n();
   const router = useRouter();
-  const [buying, setBuying] = useState(false);
 
   return (
     <div>
@@ -21,61 +19,32 @@ export function HomeView({ prebuilts }: { prebuilts: PrebuiltCardData[] }) {
           </p>
           <h1 className="section-title mt-3 text-4xl text-[var(--cyan)] md:text-6xl">AXON.MK</h1>
           <p className="mx-auto mt-4 max-w-md text-base text-[var(--text-muted)] md:text-lg">
-            {buying ? t("home.buyChoose") : t("home.hero")}
+            {t("home.hero")}
           </p>
 
-          {buying ? (
-            <div className="mt-8 space-y-3">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Link
-                  href="/prebuilts"
-                  className="glass-strong rounded-2xl p-5 text-left transition hover:border-[var(--cyan)]"
-                >
-                  <p className="section-title text-xl text-[var(--cyan)]">{t("home.buyNew")}</p>
-                  <p className="mt-1 text-sm text-[var(--text-muted)]">{t("home.buyNewHint")}</p>
-                </Link>
-                <Link
-                  href="/used"
-                  className="glass rounded-2xl p-5 text-left transition hover:border-[var(--border-strong)]"
-                >
-                  <p className="section-title text-xl text-[var(--text)]">{t("home.buyUsed")}</p>
-                  <p className="mt-1 text-sm text-[var(--text-muted)]">{t("home.buyUsedHint")}</p>
-                </Link>
-              </div>
-              <button
-                type="button"
-                onClick={() => setBuying(false)}
-                className="text-sm text-[var(--text-muted)] transition hover:text-[var(--cyan)]"
-              >
-                ← {t("home.back")}
-              </button>
-            </div>
-          ) : (
-            <div className="mt-8 grid gap-3 sm:grid-cols-3">
-              <Link
-                href="/ai-build"
-                className="glass-strong rounded-2xl p-5 text-left transition hover:border-[var(--cyan)]"
-              >
-                <p className="section-title text-xl text-[var(--cyan)]">{t("home.aiTitle")}</p>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">{t("home.aiHint")}</p>
-              </Link>
-              <Link
-                href="/configurator"
-                className="glass rounded-2xl p-5 text-left transition hover:border-[var(--border-strong)]"
-              >
-                <p className="section-title text-xl text-[var(--text)]">{t("home.buildTitle")}</p>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">{t("home.buildHint")}</p>
-              </Link>
-              <button
-                type="button"
-                onClick={() => setBuying(true)}
-                className="glass rounded-2xl p-5 text-left transition hover:border-[var(--border-strong)]"
-              >
-                <p className="section-title text-xl text-[var(--text)]">{t("home.buyTitle")}</p>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">{t("home.buyHint")}</p>
-              </button>
-            </div>
-          )}
+          <div className="mt-8 grid gap-3 sm:grid-cols-3">
+            <Link
+              href="/ai-build"
+              className="glass-strong rounded-2xl p-5 text-left transition hover:border-[var(--cyan)]"
+            >
+              <p className="section-title text-xl text-[var(--cyan)]">{t("home.aiTitle")}</p>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">{t("home.aiHint")}</p>
+            </Link>
+            <Link
+              href="/configurator"
+              className="glass rounded-2xl p-5 text-left transition hover:border-[var(--border-strong)]"
+            >
+              <p className="section-title text-xl text-[var(--text)]">{t("home.buildTitle")}</p>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">{t("home.buildHint")}</p>
+            </Link>
+            <Link
+              href="/prebuilts"
+              className="glass rounded-2xl p-5 text-left transition hover:border-[var(--border-strong)]"
+            >
+              <p className="section-title text-xl text-[var(--text)]">{t("home.buyTitle")}</p>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">{t("home.buyHint")}</p>
+            </Link>
+          </div>
         </div>
       </section>
 

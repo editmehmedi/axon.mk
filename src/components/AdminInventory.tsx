@@ -23,6 +23,7 @@ import {
 } from "@/lib/compatibility";
 import { describeReadyPc, PREBUILT_MARKUP } from "@/lib/prebuiltFromParts";
 import { inferListingGpuTdp } from "@/lib/listingPower";
+import { inferListingPartSpecs } from "@/lib/listingSpecs";
 
 export type AdminPart = {
   id: string;
@@ -171,6 +172,7 @@ function listingToAdminPart(listing: {
   sellerName: string;
 }): AdminPart | null {
   if (!BUILDER_CATEGORIES.has(listing.category)) return null;
+  const specs = inferListingPartSpecs(listing.category, listing.name);
   return {
     id: `listing:${listing.id}`,
     name: listing.name,
@@ -179,6 +181,9 @@ function listingToAdminPart(listing: {
     priceMkd: listing.priceMkd,
     stock: 1,
     imageUrl: listing.imageUrl,
+    socket: specs.socket,
+    ramType: specs.ramType,
+    formFactor: specs.formFactor,
     tdpWatts: listing.category === "GPU" ? inferListingGpuTdp(listing.name) : null,
     active: true,
     source: "used",
@@ -207,12 +212,10 @@ function matchSlot(parts: AdminPart[], category: SlotId, label: string): { id: s
 function draftFromPrebuilt(p: Prebuilt, parts: AdminPart[]): PrebuiltDraft {
   const slots = emptySlots();
   let ramQty = 1;
-  if (p.condition !== "used") {
-    for (const [category, key] of SLOT_FIELDS) {
-      const matched = matchSlot(parts, category, p[key] || "");
-      slots[category] = matched.id;
-      if (matched.ramQty) ramQty = matched.ramQty;
-    }
+  for (const [category, key] of SLOT_FIELDS) {
+    const matched = matchSlot(parts, category, p[key] || "");
+    slots[category] = matched.id;
+    if (matched.ramQty) ramQty = matched.ramQty;
   }
   return {
     name: p.name || "",
@@ -294,9 +297,10 @@ function slotLabel(category: SlotId, id: string, parts: AdminPart[], ramQty: num
   if (id === STOCK_COOLER) return "Included with CPU";
   const part = parts.find((item) => item.id === id);
   if (!part) return "";
-  const base = partLine(part);
+  const base = part.source === "used" ? part.name.trim() : partLine(part);
   const labeled = category === "RAM" && ramQty > 1 ? `${base} ×${ramQty}` : base;
-  return labeled.slice(0, 120);
+  const text = part.source === "used" ? `Used · ${labeled}` : labeled;
+  return text.slice(0, 120);
 }
 
 function withCatalogSelection(
@@ -529,7 +533,6 @@ function PrebuiltForm({
   parts,
   fromCatalog,
   busy,
-  showConditionGrade,
   title,
   saveLabel,
   onSave,
@@ -540,7 +543,6 @@ function PrebuiltForm({
   parts: AdminPart[];
   fromCatalog: boolean;
   busy: boolean;
-  showConditionGrade: boolean;
   title: string;
   saveLabel: string;
   onSave: () => void;
@@ -555,6 +557,39 @@ function PrebuiltForm({
   return (
     <div className="glass mb-4 space-y-4 rounded-2xl p-4">
       <p className="text-sm font-medium text-[var(--cyan)]">{title}</p>
+      <fieldset>
+        <legend className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+          {t("used.condition")}
+        </legend>
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {(
+            [
+              ["new", t("builder.conditionNew")],
+              ["used", t("builder.conditionUsed")],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={draft.condition === id}
+              onClick={() =>
+                setDraft((d) => ({
+                  ...d,
+                  condition: id,
+                  conditionGrade: id === "new" ? "" : d.conditionGrade,
+                }))
+              }
+              className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                draft.condition === id
+                  ? "bg-[var(--cyan)] text-[#041018]"
+                  : "bg-[rgba(34,211,238,0.08)] text-[var(--text-muted)] hover:text-[var(--text)]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </fieldset>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t("admin.prebuiltName")} className="sm:col-span-2">
           <input
@@ -563,12 +598,13 @@ function PrebuiltForm({
             onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
           />
         </Field>
-        {showConditionGrade && (
+        {draft.condition === "used" && (
           <Field label={t("admin.conditionGrade")} className="sm:col-span-2">
             <input
               className="input !py-2 !text-sm"
               value={draft.conditionGrade}
               onChange={(e) => setDraft((d) => ({ ...d, conditionGrade: e.target.value }))}
+              placeholder={t("admin.conditionGrade")}
             />
           </Field>
         )}
@@ -883,13 +919,15 @@ type Props = {
   onMessage: (msg: string) => void;
 };
 
-type InvView = "parts" | "usedParts" | "prebuilts" | "used";
+type InvView = "parts" | "usedParts" | "prebuilts";
+type PcConditionFilter = "ALL" | "new" | "used";
 
 export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props) {
   const { t } = useI18n();
   const [view, setView] = useState<InvView>("parts");
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
   const [visibilityFilter, setVisibilityFilter] = useState<"ALL" | "VISIBLE" | "HIDDEN">("ALL");
+  const [pcCondition, setPcCondition] = useState<PcConditionFilter>("ALL");
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft());
@@ -912,6 +950,7 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
   >([]);
   const [listingPrices, setListingPrices] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -963,12 +1002,12 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
 
   const builderParts = useMemo(() => [...parts, ...usedParts], [parts, usedParts]);
 
-  const newPrebuilts = useMemo(
-    () => prebuilts.filter((p) => p.condition !== "used"),
+  const newPrebuiltCount = useMemo(
+    () => prebuilts.filter((p) => p.condition !== "used").length,
     [prebuilts],
   );
-  const usedPrebuilts = useMemo(
-    () => prebuilts.filter((p) => p.condition === "used"),
+  const usedPrebuiltCount = useMemo(
+    () => prebuilts.filter((p) => p.condition === "used").length,
     [prebuilts],
   );
 
@@ -1015,17 +1054,18 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
     setSearch("");
     setCategoryFilter("ALL");
     setVisibilityFilter("ALL");
+    setPcCondition("ALL");
   }
 
-  function openAddForm(condition: "new" | "used") {
-    if (addingPrebuilt && !editingPrebuiltId && prebuiltDraft.condition === condition) {
+  function openAddForm() {
+    if (addingPrebuilt && !editingPrebuiltId) {
       setAddingPrebuilt(false);
       setPrebuiltDraft(emptyPrebuiltDraft());
       return;
     }
     setEditingPrebuiltId(null);
     setAddingPrebuilt(true);
-    setPrebuiltDraft({ ...emptyPrebuiltDraft(), condition });
+    setPrebuiltDraft(emptyPrebuiltDraft());
   }
 
   function startEditPrebuilt(p: Prebuilt) {
@@ -1037,10 +1077,10 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
   useEffect(() => {
     if (!editingPrebuiltId || usedParts.length === 0) return;
     const pc = prebuilts.find((item) => item.id === editingPrebuiltId);
-    if (!pc || pc.condition === "used") return;
+    if (!pc) return;
     const matched = draftFromPrebuilt(pc, builderParts);
     setPrebuiltDraft((current) => {
-      if (current.condition !== "new") return current;
+      if (current.condition !== (pc.condition === "used" ? "used" : "new")) return current;
       let changed = false;
       const slots = { ...current.slots };
       for (const [category] of SLOT_FIELDS) {
@@ -1082,14 +1122,18 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
     })).filter((group) => group.items.length > 0);
   }, [filtered, categoryFilter]);
 
-  const catalogList = view === "used" ? usedPrebuilts : newPrebuilts;
+  const catalogList = useMemo(() => {
+    if (pcCondition === "used") return prebuilts.filter((p) => p.condition === "used");
+    if (pcCondition === "new") return prebuilts.filter((p) => p.condition !== "used");
+    return prebuilts;
+  }, [prebuilts, pcCondition]);
   const catalogHidden = useMemo(
-    () => catalogList.filter((p) => p.active === false).length,
-    [catalogList],
+    () => prebuilts.filter((p) => p.active === false).length,
+    [prebuilts],
   );
   const catalogOut = useMemo(
-    () => catalogList.filter((p) => p.stock <= 0).length,
-    [catalogList],
+    () => prebuilts.filter((p) => p.stock <= 0).length,
+    [prebuilts],
   );
 
   const filteredPrebuilts = useMemo(() => {
@@ -1104,6 +1148,27 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
         .includes(q);
     });
   }, [catalogList, search, visibilityFilter]);
+
+  async function refreshStores() {
+    setRefreshing(true);
+    try {
+      const res = await fetch("/api/admin/store-refresh", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        onMessage(data.error || t("admin.refreshFailed"));
+        return;
+      }
+      const prices = Number(data.prices) || 0;
+      const stocks = Number(data.stocks) || 0;
+      const added = Number(data.added) || 0;
+      const removed = Number(data.removed) || 0;
+      if (prices + stocks + added + removed === 0) onMessage(t("admin.refreshNone"));
+      else onMessage(t("admin.refreshDone", { prices, stocks, added, removed }));
+      await onRefresh();
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   function startEdit(p: AdminPart) {
     setAdding(false);
@@ -1343,8 +1408,7 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
   const views: { id: InvView; label: string; count: number }[] = [
     { id: "parts", label: t("admin.parts"), count: parts.length },
     { id: "usedParts", label: t("admin.usedParts"), count: inventoryListings.length },
-    { id: "prebuilts", label: t("admin.prebuilts"), count: newPrebuilts.length },
-    { id: "used", label: t("admin.usedPcs"), count: usedPrebuilts.length },
+    { id: "prebuilts", label: t("admin.prebuilts"), count: prebuilts.length },
   ];
 
   return (
@@ -1372,17 +1436,27 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
               <h2 className="section-title text-xl">{t("admin.parts")}</h2>
               <p className="mt-1 max-w-xl text-sm text-[var(--text-muted)]">{t("admin.inventoryHint")}</p>
             </div>
-            <button
-              type="button"
-              className="btn btn-primary !px-3 !py-1.5 !text-xs"
-              onClick={() => {
-                setEditingId(null);
-                setAdding((v) => !v);
-                setAddDraft(emptyDraft());
-              }}
-            >
-              {adding ? t("admin.cancel") : t("admin.addPart")}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="btn btn-ghost !px-3 !py-1.5 !text-xs"
+                disabled={refreshing || busy}
+                onClick={() => void refreshStores()}
+              >
+                {refreshing ? t("admin.refreshingStores") : t("admin.refreshStores")}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary !px-3 !py-1.5 !text-xs"
+                onClick={() => {
+                  setEditingId(null);
+                  setAdding((v) => !v);
+                  setAddDraft(emptyDraft());
+                }}
+              >
+                {adding ? t("admin.cancel") : t("admin.addPart")}
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-2 sm:max-w-md">
@@ -1682,37 +1756,24 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
         </div>
       )}
 
-      {(view === "prebuilts" || view === "used") && (
+      {view === "prebuilts" && (
         <div className="space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="section-title text-xl">
-                {view === "used" ? t("admin.usedPcs") : t("admin.prebuilts")}
-              </h2>
-              <p className="mt-1 max-w-xl text-sm text-[var(--text-muted)]">
-                {view === "used" ? t("admin.usedHint") : t("admin.prebuiltsHint")}
-              </p>
+              <h2 className="section-title text-xl">{t("admin.prebuilts")}</h2>
+              <p className="mt-1 max-w-xl text-sm text-[var(--text-muted)]">{t("admin.prebuiltsHint")}</p>
             </div>
             <button
               type="button"
               className="btn btn-primary !px-3 !py-1.5 !text-xs"
-              onClick={() => openAddForm(view === "used" ? "used" : "new")}
+              onClick={openAddForm}
             >
-              {addingPrebuilt &&
-              !editingPrebuiltId &&
-              prebuiltDraft.condition === (view === "used" ? "used" : "new")
-                ? t("admin.cancel")
-                : view === "used"
-                  ? t("admin.addUsed")
-                  : t("admin.addPrebuilt")}
+              {addingPrebuilt && !editingPrebuiltId ? t("admin.cancel") : t("admin.addPrebuilt")}
             </button>
           </div>
 
           <div className="grid grid-cols-3 gap-2 sm:max-w-md">
-            <StatChip
-              label={view === "used" ? t("admin.usedPcs") : t("admin.prebuilts")}
-              value={catalogList.length}
-            />
+            <StatChip label={t("admin.prebuilts")} value={prebuilts.length} />
             <StatChip label={t("admin.hiddenBadge")} value={catalogHidden} tone="muted" />
             <StatChip label={t("admin.outOfStock")} value={catalogOut} tone="warn" />
           </div>
@@ -1742,29 +1803,36 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
                 </button>
               ))}
             </div>
+            <div className="flex flex-wrap gap-1">
+              {(
+                [
+                  ["ALL", t("builder.filterAll"), prebuilts.length],
+                  ["new", t("builder.conditionNew"), newPrebuiltCount],
+                  ["used", t("builder.conditionUsed"), usedPrebuiltCount],
+                ] as const
+              ).map(([id, label, count]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setPcCondition(id)}
+                  className={pillClass(pcCondition === id)}
+                >
+                  {label}
+                  <span className="ml-1 opacity-60">{count}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
-          {((addingPrebuilt &&
-            !editingPrebuiltId &&
-            prebuiltDraft.condition === (view === "used" ? "used" : "new")) ||
-            Boolean(editingPrebuiltId)) && (
+          {(addingPrebuilt || Boolean(editingPrebuiltId)) && (
             <PrebuiltForm
               draft={prebuiltDraft}
               setDraft={setPrebuiltDraft}
               parts={builderParts}
-              fromCatalog={view === "prebuilts"}
+              fromCatalog
               busy={busy}
-              showConditionGrade={view === "used"}
-              title={
-                editingPrebuiltId
-                  ? view === "used"
-                    ? t("admin.editUsedTitle")
-                    : t("admin.editPrebuiltTitle")
-                  : view === "used"
-                    ? t("admin.addUsedTitle")
-                    : t("admin.addPrebuiltTitle")
-              }
-              saveLabel={view === "used" ? t("admin.saveUsed") : t("admin.savePrebuilt")}
+              title={editingPrebuiltId ? t("admin.editPrebuiltTitle") : t("admin.addPrebuiltTitle")}
+              saveLabel={t("admin.savePrebuilt")}
               onSave={() => void savePrebuilt()}
               onCancel={cancelPrebuiltForm}
             />
@@ -1772,11 +1840,9 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
 
           {!filteredPrebuilts.length ? (
             <EmptyState>
-              {search.trim() || visibilityFilter !== "ALL"
+              {search.trim() || visibilityFilter !== "ALL" || pcCondition !== "ALL"
                 ? t("admin.noPartsMatch")
-                : view === "used"
-                  ? t("admin.usedEmpty")
-                  : t("admin.prebuiltEmpty")}
+                : t("admin.prebuiltEmpty")}
             </EmptyState>
           ) : (
             <div className="glass divide-y divide-[var(--border)] overflow-hidden rounded-2xl">
@@ -1785,7 +1851,7 @@ export function AdminInventory({ parts, prebuilts, onRefresh, onMessage }: Props
                   <PrebuiltListRow
                     key={p.id}
                     p={p}
-                    usedLabel={view === "used" ? t("admin.usedTag") : undefined}
+                    usedLabel={t("admin.usedTag")}
                     busy={busy}
                     onToggleVisible={() => void togglePrebuiltVisible(p)}
                     onEdit={() => startEditPrebuilt(p)}

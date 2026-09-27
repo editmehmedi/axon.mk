@@ -24,7 +24,6 @@ export function Navbar() {
     { href: "/prebuilts", label: t("nav.prebuilts") },
     { href: "/configurator", label: t("nav.configurator") },
     { href: "/ai-build", label: t("nav.ai") },
-    { href: "/used", label: t("nav.used") },
     { href: "/used-parts", label: t("nav.usedParts") },
     { href: "/saved", label: t("nav.saved") },
     { href: "/orders", label: t("nav.orders") },
@@ -44,14 +43,19 @@ export function Navbar() {
 
   useEffect(() => {
     if (!menuOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setMenuOpen(false);
     }
     window.addEventListener("keydown", onKey);
     return () => {
-      document.body.style.overflow = prev;
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
       window.removeEventListener("keydown", onKey);
     };
   }, [menuOpen]);
@@ -155,10 +159,11 @@ export function Navbar() {
         id="site-menu"
         aria-hidden={!menuOpen}
         inert={!menuOpen}
-        className={`fixed inset-y-0 left-0 z-[75] flex w-[min(20rem,86vw)] flex-col border-r border-[var(--border)] bg-[rgba(8,13,22,0.98)] p-4 pt-20 shadow-[20px_0_50px_rgba(0,0,0,0.35)] backdrop-blur-xl transition-transform duration-200 ease-out ${
+        className={`fixed top-0 left-0 z-[75] flex h-dvh max-h-dvh w-[min(20rem,86vw)] flex-col overflow-hidden border-r border-[var(--border)] bg-[rgba(8,13,22,0.98)] pt-20 shadow-[20px_0_50px_rgba(0,0,0,0.35)] transition-transform duration-200 ease-out ${
           menuOpen ? "translate-x-0" : "pointer-events-none -translate-x-full"
         }`}
       >
+        <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-y-contain px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         <div className="mb-4 space-y-4 border-b border-[var(--border)] pb-4 md:hidden">
           <div>
             <p className="mb-2 px-0.5 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
@@ -214,6 +219,7 @@ export function Navbar() {
               {t("nav.admin")}
             </Link>
           )}
+        </div>
         </div>
       </nav>
     </>
