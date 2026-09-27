@@ -63,39 +63,50 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Host not allowed" }, { status: 403 });
   }
 
+  const headerSets: HeadersInit[] = [
+    {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      Referer: refererFor(target.hostname),
+      Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+    },
+    {
+      "User-Agent": "axon-mk",
+      Accept: "*/*",
+    },
+  ];
+
+  let lastStatus = 0;
+  let lastType = "";
+  let preview = "";
   try {
-    const upstream = await fetch(target.toString(), {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Referer: refererFor(target.hostname),
-        Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-      },
-      cache: "no-store",
-    });
+    for (const headers of headerSets) {
+      const upstream = await fetch(target.toString(), { headers, cache: "no-store" });
+      lastStatus = upstream.status;
+      const body = await upstream.arrayBuffer();
+      const bytes = new Uint8Array(body);
+      const headerType = (upstream.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+      lastType = headerType;
+      if (!preview) {
+        preview = Array.from(bytes.slice(0, 80), (b) => (b >= 32 && b < 127 ? String.fromCharCode(b) : ".")).join("");
+      }
+      if (!upstream.ok) continue;
+      const contentType = headerType.startsWith("image/") ? headerType : sniffImageType(bytes);
+      if (!contentType) continue;
 
-    if (!upstream.ok) {
-      return NextResponse.json(
-        { error: `Upstream ${upstream.status}` },
-        { status: upstream.status === 404 ? 404 : 502 }
-      );
+      return new NextResponse(body, {
+        status: 200,
+        headers: {
+          "Content-Type": contentType,
+          "Cache-Control": "public, max-age=604800, stale-while-revalidate=86400",
+        },
+      });
     }
 
-    const body = await upstream.arrayBuffer();
-    const bytes = new Uint8Array(body);
-    const headerType = (upstream.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
-    const contentType = headerType.startsWith("image/") ? headerType : sniffImageType(bytes);
-    if (!contentType) {
-      return NextResponse.json({ error: "Not an image" }, { status: 502 });
-    }
-
-    return new NextResponse(body, {
-      status: 200,
-      headers: {
-        "Content-Type": contentType,
-        "Cache-Control": "public, max-age=604800, stale-while-revalidate=86400",
-      },
-    });
+    return NextResponse.json(
+      { error: lastStatus ? `Upstream ${lastStatus} ${lastType || "not an image"}` : "Not an image", preview },
+      { status: lastStatus === 404 ? 404 : 502 }
+    );
   } catch {
     return NextResponse.json({ error: "Fetch failed" }, { status: 502 });
   }
