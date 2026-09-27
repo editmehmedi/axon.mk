@@ -21,6 +21,33 @@ function refererFor(hostname: string): string {
   return "https://www.anhoch.com/";
 }
 
+/** Some shop CDNs omit Content-Type when the request comes from the host. */
+function sniffImageType(bytes: Uint8Array): string | null {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+    return "image/png";
+  }
+  if (bytes.length >= 6 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return "image/gif";
+  if (
+    bytes.length >= 12 &&
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  ) {
+    return "image/webp";
+  }
+  if (bytes.length >= 12 && bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
+    const brand = String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]);
+    if (brand === "avif" || brand === "avis") return "image/avif";
+  }
+  return null;
+}
+
 /**
  * Shops block hotlinking. Proxy their product images so the catalog can display them.
  */
@@ -44,7 +71,7 @@ export async function GET(req: Request) {
         Referer: refererFor(target.hostname),
         Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
       },
-      next: { revalidate: 60 * 60 * 24 * 7 },
+      cache: "no-store",
     });
 
     if (!upstream.ok) {
@@ -54,11 +81,13 @@ export async function GET(req: Request) {
       );
     }
 
-    const contentType = upstream.headers.get("content-type") || "";
-    if (!contentType.startsWith("image/")) {
+    const body = await upstream.arrayBuffer();
+    const bytes = new Uint8Array(body);
+    const headerType = (upstream.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    const contentType = headerType.startsWith("image/") ? headerType : sniffImageType(bytes);
+    if (!contentType) {
       return NextResponse.json({ error: "Not an image" }, { status: 502 });
     }
-    const body = await upstream.arrayBuffer();
 
     return new NextResponse(body, {
       status: 200,
