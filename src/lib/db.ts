@@ -10,8 +10,9 @@ function createPrisma() {
 
 function getPrisma() {
   const existing = globalForPrisma.prisma;
-  // Hot reload can keep a client built before UserListing existed.
-  if (existing && typeof (existing as { userListing?: unknown }).userListing !== "undefined") {
+  // Hot reload can keep a client built before ClassifiedListing existed.
+  const cached = existing as { userListing?: unknown; classifiedListing?: unknown } | undefined;
+  if (existing && cached && typeof cached.userListing !== "undefined" && typeof cached.classifiedListing !== "undefined") {
     return existing;
   }
   if (existing) {

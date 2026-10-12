@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
+import { refreshClassifiedListings } from "@/lib/classifiedListings";
 import { refreshStoreCatalog } from "@/lib/storeCatalogRefresh";
 
 export const runtime = "nodejs";
@@ -26,8 +27,21 @@ export async function GET(req: Request) {
   }
 
   try {
-    const result = await refreshStoreCatalog();
-    return NextResponse.json(result);
+    const [store, classified] = await Promise.allSettled([
+      refreshStoreCatalog(),
+      refreshClassifiedListings(),
+    ]);
+    if (store.status === "rejected") {
+      const msg = store.reason instanceof Error ? store.reason.message : "Error";
+      return NextResponse.json({ error: msg }, { status: 500 });
+    }
+    return NextResponse.json({
+      ...store.value,
+      classified:
+        classified.status === "fulfilled"
+          ? classified.value
+          : { error: classified.reason instanceof Error ? classified.reason.message : "Error" },
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error";
     return NextResponse.json({ error: msg }, { status: 500 });

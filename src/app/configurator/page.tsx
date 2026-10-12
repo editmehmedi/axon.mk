@@ -75,10 +75,13 @@ type Part = CompatPart & {
   includesCooler?: boolean | null;
   source?: "new" | "used";
   warrantyMonths?: number | null;
+  sourceSite?: string | null;
+  sourceUrl?: string | null;
 };
 
 function isUsedPart(part: Part | CompatPart | null | undefined): boolean {
-  return Boolean(part && String(part.id).startsWith("listing:"));
+  const id = String(part && "id" in part ? part.id : "");
+  return id.startsWith("listing:") || id.startsWith("classified:");
 }
 
 function partHasStock(part: Part | CompatPart): boolean {
@@ -87,7 +90,8 @@ function partHasStock(part: Part | CompatPart): boolean {
 }
 
 function listingIdFromPart(part: Part): string {
-  return part.id.slice("listing:".length);
+  if (part.id.startsWith("classified:")) return part.id;
+  return part.id.startsWith("listing:") ? part.id.slice("listing:".length) : part.id;
 }
 
 function partLabel(part: Part | CompatPart, usedBadge: string): string {
@@ -335,12 +339,14 @@ export default function ConfiguratorPage() {
               imageUrl: string | null;
               sellerName: string;
               description?: string | null;
+              sourceSite?: string | null;
+              sourceUrl?: string | null;
             }) => {
               const specs = inferListingPartSpecs(l.category, l.name, l.description ?? "");
               return {
-                id: `listing:${l.id}`,
+                id: l.sourceSite ? `classified:${l.id}` : `listing:${l.id}`,
                 name: l.name,
-                brand: l.category === "GPU" ? "Used" : l.sellerName || "Used",
+                brand: l.sourceSite || (l.category === "GPU" ? "Used" : l.sellerName || "Used"),
                 category: l.category,
                 priceMkd: l.priceMkd,
                 stock: 1,
@@ -351,6 +357,8 @@ export default function ConfiguratorPage() {
                 tdpWatts: l.category === "GPU" ? inferListingGpuTdp(l.name) : null,
                 formFactor: specs.formFactor,
                 source: "used" as const,
+                sourceSite: l.sourceSite ?? null,
+                sourceUrl: l.sourceUrl ?? null,
                 warrantyMonths: 3,
               } satisfies Part;
             },
@@ -1601,11 +1609,29 @@ export default function ConfiguratorPage() {
                     )}
                   </div>
                   <p className="truncate text-[10px] text-[var(--cyan-dim)]">
-                    {condition === "used"
-                      ? part.category === "GPU"
-                        ? t("builder.usedBadge")
-                        : t("builder.sellerLabel", { name: part.brand })
-                      : part.brand}
+                    {part.sourceSite ? (
+                      part.sourceUrl ? (
+                        <a
+                          href={part.sourceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {part.sourceSite}
+                        </a>
+                      ) : (
+                        part.sourceSite
+                      )
+                    ) : condition === "used" ? (
+                      part.category === "GPU" ? (
+                        t("builder.usedBadge")
+                      ) : (
+                        t("builder.sellerLabel", { name: part.brand })
+                      )
+                    ) : (
+                      part.brand
+                    )}
                   </p>
                   <p className="mt-0.5 line-clamp-2 text-xs font-medium leading-snug">{part.name}</p>
                   {isStockCoolerPart(part) ? (

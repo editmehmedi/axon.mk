@@ -21,7 +21,12 @@ function normalizeListingId(id: string) {
 }
 
 function isCatalogPartId(id: string) {
-  return Boolean(id) && !id.startsWith("none:") && !id.startsWith("listing:");
+  return (
+    Boolean(id) &&
+    !id.startsWith("none:") &&
+    !id.startsWith("listing:") &&
+    !id.startsWith("classified:")
+  );
 }
 
 const customerSchema = z.object({
@@ -158,8 +163,15 @@ export async function POST(req: Request) {
     if (body.type === "CUSTOM") {
       const data = customOrderSchema.parse(body);
       const partIds = (data.partIds ?? []).filter(isCatalogPartId);
-      const listingIds = [...new Set((data.listingIds ?? []).map(normalizeListingId).filter(Boolean))];
-      if (partIds.length + listingIds.length < 1) {
+      const requestedListings = [...new Set((data.listingIds ?? []).map((id) => id.trim()).filter(Boolean))];
+      const classifiedIds = requestedListings
+        .filter((id) => id.startsWith("classified:"))
+        .map((id) => id.slice("classified:".length));
+      const listingIds = requestedListings
+        .filter((id) => !id.startsWith("classified:"))
+        .map(normalizeListingId)
+        .filter(Boolean);
+      if (partIds.length + listingIds.length + classifiedIds.length < 1) {
         return NextResponse.json({ error: "Нема избрани делови" }, { status: 400 });
       }
 
@@ -189,6 +201,18 @@ export async function POST(req: Request) {
         );
       }
 
+      const classified = classifiedIds.length
+        ? await prisma.classifiedListing.findMany({
+            where: { id: { in: classifiedIds }, status: "active" },
+          })
+        : [];
+      if (classified.length !== classifiedIds.length) {
+        return NextResponse.json(
+          { error: "Некои половни делови не се достапни" },
+          { status: 400 },
+        );
+      }
+
       type SelItem = {
         id: string;
         category: string;
@@ -201,7 +225,8 @@ export async function POST(req: Request) {
         tdpWatts?: number | null;
         formFactor?: string | null;
         includesCooler?: boolean | null;
-        kind: "part" | "listing";
+        kind: "part" | "listing" | "classified";
+        url?: string;
       };
 
       const selection: Record<string, SelItem | SelItem[]> = {};
@@ -304,6 +329,39 @@ export async function POST(req: Request) {
         }
       }
 
+      for (const ad of classified) {
+        if (!(BUILDER_STEPS as readonly string[]).includes(ad.category)) {
+          return NextResponse.json(
+            { error: "That used part cannot be used in the builder" },
+            { status: 400 },
+          );
+        }
+        const specs = inferListingPartSpecs(ad.category, ad.name, ad.description ?? "");
+        const item: SelItem = {
+          id: ad.id,
+          category: ad.category,
+          name: ad.name,
+          brand: ad.source === "pazar3" ? "Pazar3" : "Reklama5",
+          priceMkd: ad.priceMkd,
+          socket: specs.socket,
+          ramType: specs.ramType,
+          formFactor: specs.formFactor,
+          kind: "classified",
+          url: ad.url,
+        };
+        lineItems.push(item);
+        if (ad.category === "SSD") {
+          if (selection.SSD) {
+            return NextResponse.json({ error: `Дупликат категорија: ${ad.category}` }, { status: 400 });
+          }
+          selection.SSD = [item];
+        } else if (selection[ad.category]) {
+          return NextResponse.json({ error: `Дупликат категорија: ${ad.category}` }, { status: 400 });
+        } else {
+          selection[ad.category] = item;
+        }
+      }
+
       const single = (cat: string) => {
         const v = selection[cat];
         return v && !Array.isArray(v) ? v : null;
@@ -375,6 +433,15 @@ export async function POST(req: Request) {
             throw new Error(`Половниот дел веќе е продаден: ${l.name}`);
           }
         }
+        for (const ad of classified) {
+          const updated = await tx.classifiedListing.updateMany({
+            where: { id: ad.id, status: "active" },
+            data: { status: "sold" },
+          });
+          if (updated.count !== 1) {
+            throw new Error(`Половниот дел веќе е продаден: ${ad.name}`);
+          }
+        }
         return tx.order.create({
           data: {
             trackingCode,
@@ -395,7 +462,7 @@ export async function POST(req: Request) {
             items: {
               create: orderLines.map(({ item: p, qty }) => ({
                 ...(p.kind === "part" ? { partId: p.id } : {}),
-                label: p.brand ? `${p.brand} ${p.name}` : p.name,
+                label: [p.brand, p.name, p.url].filter(Boolean).join(" "),
                 category: p.category,
                 priceMkd: p.priceMkd,
                 qty,

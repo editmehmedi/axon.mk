@@ -1,8 +1,16 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getSession, requireUser } from "@/lib/auth";
-import { isListingCategory, LISTING_CATEGORIES } from "@/lib/listingCategories";
+import { isListingCategory, LISTING_CATEGORIES, PART_LISTING_CATEGORIES } from "@/lib/listingCategories";
+import {
+  classifiedCutoff,
+  classifiedSourceLabel,
+  refreshClassifiedListingsIfStale,
+} from "@/lib/classifiedListings";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const specField = z.string().trim().max(120).optional().default("");
 
@@ -108,6 +116,9 @@ export async function GET(req: Request) {
 
     const category = url.searchParams.get("category")?.trim() || "";
     const partsOnly = url.searchParams.get("partsOnly") === "1";
+    after(() => {
+      refreshClassifiedListingsIfStale().catch((err) => console.error("[classified]", err));
+    });
     const items = await prisma.userListing.findMany({
       where: {
         status: "active",
@@ -122,18 +133,70 @@ export async function GET(req: Request) {
       orderBy: { createdAt: "desc" },
       take: 100,
     });
+    const classified =
+      category === "PC"
+        ? []
+        : await prisma.classifiedListing.findMany({
+            where: {
+              status: "active",
+              postedAt: { gte: classifiedCutoff() },
+              ...(category && isListingCategory(category) ? { category } : {}),
+              ...(partsOnly && !category ? { category: { in: [...PART_LISTING_CATEGORIES] } } : {}),
+            },
+            orderBy: { postedAt: "desc" },
+            take: 300,
+          });
+
+    const bySource = new Map<string, typeof classified>();
+    for (const row of classified) {
+      const list = bySource.get(row.source) ?? [];
+      list.push(row);
+      bySource.set(row.source, list);
+    }
+    const sourceOrder = ["pazar3", "reklama5"].filter((source) => bySource.has(source));
+    for (const source of bySource.keys()) {
+      if (!sourceOrder.includes(source)) sourceOrder.push(source);
+    }
+    const mixed: typeof classified = [];
+    const longest = Math.max(0, ...sourceOrder.map((source) => bySource.get(source)?.length ?? 0));
+    for (let index = 0; index < longest; index++) {
+      for (const source of sourceOrder) {
+        const row = bySource.get(source)?.[index];
+        if (row) mixed.push(row);
+      }
+    }
+
     return NextResponse.json({
-      items: items.map((row) => {
-        const item = mapListing(row);
-        if (row.category !== "GPU") return item;
-        return {
-          ...item,
+      items: [
+        ...mixed.map((row) => ({
+          id: row.id,
+          name: row.name,
+          category: row.category,
+          description: row.description,
+          priceMkd: row.priceMkd,
+          imageUrl: row.imageUrl,
+          status: row.status,
+          createdAt: row.postedAt.toISOString(),
           sellerId: "",
-          sellerName: "",
+          sellerName: classifiedSourceLabel(row.source),
           sellerPhone: null,
           sellerEmail: null,
-        };
-      }),
+          sourceSite: classifiedSourceLabel(row.source),
+          sourceUrl: row.url,
+          city: row.city,
+        })),
+        ...items.map((row) => {
+          const item = mapListing(row);
+          if (row.category !== "GPU") return item;
+          return {
+            ...item,
+            sellerId: "",
+            sellerName: "",
+            sellerPhone: null,
+            sellerEmail: null,
+          };
+        }),
+      ],
     });
   } catch (e) {
     console.error("[sell GET]", e);

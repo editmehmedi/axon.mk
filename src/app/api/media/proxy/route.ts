@@ -18,6 +18,8 @@ function refererFor(hostname: string): string {
   if (hostname.endsWith("neptun.mk")) return "https://www.neptun.mk/";
   if (hostname.includes("digitaloceanspaces.com")) return "https://setec.mk/";
   if (hostname.endsWith("gjirafamall.tech")) return "https://gjirafa50.mk/";
+  if (hostname.endsWith("reklama5.mk")) return "https://reklama5.mk/";
+  if (hostname.endsWith("pazar3.mk")) return "https://www.pazar3.mk/";
   return "https://www.anhoch.com/";
 }
 

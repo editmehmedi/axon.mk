@@ -24,6 +24,7 @@ export function UsedPartsCatalog() {
   const [items, setItems] = useState<SellListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState("");
+  const [source, setSource] = useState("");
 
   useEffect(() => {
     setLoading(true);
@@ -45,6 +46,18 @@ export function UsedPartsCatalog() {
     ],
     [t],
   );
+  const sources = useMemo(
+    () => [
+      { value: "", label: t("usedParts.sourceAll") },
+      { value: "Pazar3", label: "Pazar3" },
+      { value: "Reklama5", label: "Reklama5" },
+    ],
+    [t],
+  );
+  const visible = useMemo(
+    () => (source ? items.filter((item) => item.sourceSite === source) : items),
+    [items, source],
+  );
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
@@ -58,6 +71,23 @@ export function UsedPartsCatalog() {
         <Link href="/sell" className="btn btn-primary !text-sm">
           {t("usedParts.sellCta")}
         </Link>
+      </div>
+
+      <div className="mb-3 flex flex-wrap gap-2">
+        {sources.map((f) => (
+          <button
+            key={f.value || "all-sources"}
+            type="button"
+            onClick={() => setSource(f.value)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+              source === f.value
+                ? "bg-[rgba(34,211,238,0.15)] text-[var(--cyan)]"
+                : "bg-[rgba(34,211,238,0.05)] text-[var(--text-muted)] hover:text-[var(--text)]"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
       </div>
 
       <div className="mb-6 flex flex-wrap gap-2">
@@ -79,7 +109,7 @@ export function UsedPartsCatalog() {
 
       {loading ? (
         <p className="text-sm text-[var(--text-muted)]">{t("usedParts.loading")}</p>
-      ) : items.length === 0 ? (
+      ) : visible.length === 0 ? (
         <div className="glass rounded-2xl p-8 text-center">
           <p className="text-[var(--text-muted)]">{t("usedParts.empty")}</p>
           <Link href="/sell" className="btn btn-ghost mt-4 inline-flex !text-sm">
@@ -88,7 +118,7 @@ export function UsedPartsCatalog() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {items.map((item) => {
+          {visible.map((item) => {
             const img = item.imageUrl?.trim()
               ? proxiedExternalImage(item.imageUrl.trim())
               : null;
@@ -111,14 +141,28 @@ export function UsedPartsCatalog() {
                   {item.description ? (
                     <p className="line-clamp-2 text-sm text-[var(--text-muted)]">{item.description}</p>
                   ) : null}
-                  {item.category === "GPU" ? null : (
+                  {item.sourceSite ? (
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {[item.sourceSite, item.city].filter(Boolean).join(" · ")}
+                    </p>
+                  ) : item.category === "GPU" ? null : (
                     <p className="text-xs text-[var(--text-muted)]">
                       {t("sell.seller", { name: item.sellerName })}
                     </p>
                   )}
-                  <p className="mt-auto section-title text-xl text-[var(--cyan)]">
-                    {formatPrice(item.priceMkd)}
-                  </p>
+                  <div className="mt-auto flex items-end justify-between gap-3">
+                    <p className="section-title text-xl text-[var(--cyan)]">{formatPrice(item.priceMkd)}</p>
+                    {item.sourceUrl && item.sourceSite ? (
+                      <a
+                        href={item.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs font-medium text-[var(--cyan)] hover:underline"
+                      >
+                        {t("usedParts.openAd", { source: item.sourceSite })}
+                      </a>
+                    ) : null}
+                  </div>
                 </div>
               </article>
             );

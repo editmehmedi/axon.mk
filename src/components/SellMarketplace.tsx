@@ -21,6 +21,9 @@ export type SellListing = {
   createdAt: string;
   sellerId: string;
   sellerName: string;
+  sourceSite?: string;
+  sourceUrl?: string;
+  city?: string;
   cpuLabel?: string;
   coolerLabel?: string;
   motherboardLabel?: string;

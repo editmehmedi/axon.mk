@@ -15,6 +15,9 @@ const SHOP_IMAGE_HOSTS = new Set([
   "www.neptun.mk",
   "neptun.mk",
   "50cdn.gjirafamall.tech",
+  "reklama5.mk",
+  "www.reklama5.mk",
+  "media.pazar3.mk",
 ]);
 
 function isImagePath(pathname: string): boolean {

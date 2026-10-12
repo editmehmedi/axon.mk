@@ -84,6 +84,29 @@ model UserListing {
   @@index([sellerId])
 }
 
+/// Public classified ad mirrored from Reklama5 or Pazar3. Only ads from the last two weeks stay active.
+model ClassifiedListing {
+  id          String   @id @default(cuid())
+  source      String
+  externalId  String
+  url         String
+  name        String
+  category    String
+  description String   @default("")
+  priceMkd    Int
+  imageUrl    String?
+  city        String   @default("")
+  postedAt    DateTime
+  /// active | sold | expired
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([source, externalId])
+  @@index([status, postedAt])
+  @@index([status, category])
+}
+
 model Part {
   id            String       @id @default(cuid())
   name          String
@@ -187,6 +210,7 @@ model SiteSettings {
   assemblyFeeMkd  Int    @default(2500)
   currency        String @default("MKD")
   companyName     String @default("AXON.MK")
-  supportPhone    String @default("+389 70 000 000")
-  supportViber    String @default("+389 70 000 000")
+  supportPhone       String    @default("+389 70 000 000")
+  supportViber       String    @default("+389 70 000 000")
+  classifiedSyncedAt DateTime?
 }

@@ -170,13 +170,14 @@ function listingToAdminPart(listing: {
   priceMkd: number;
   imageUrl: string | null;
   sellerName: string;
+  sourceSite?: string | null;
 }): AdminPart | null {
   if (!BUILDER_CATEGORIES.has(listing.category)) return null;
   const specs = inferListingPartSpecs(listing.category, listing.name);
   return {
-    id: `listing:${listing.id}`,
+    id: listing.sourceSite ? `classified:${listing.id}` : `listing:${listing.id}`,
     name: listing.name,
-    brand: listing.sellerName || "Used",
+    brand: listing.sourceSite || listing.sellerName || "Used",
     category: listing.category,
     priceMkd: listing.priceMkd,
     stock: 1,

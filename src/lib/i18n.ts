@@ -107,11 +107,13 @@ const en: Dict = {
 
   "usedParts.title": "Used Parts",
   "usedParts.desc":
-    "Community listings from users — approved by AXON.MK before they go live.",
+    "Community listings, plus used parts posted in the last two weeks on Reklama5 and Pazar3.",
+  "usedParts.openAd": "Open on {source}",
   "usedParts.sellCta": "Sell your part",
   "usedParts.loading": "Loading…",
   "usedParts.empty": "No used parts listed yet.",
   "usedParts.filterAll": "All parts",
+  "usedParts.sourceAll": "All sources",
 
   "builder.title": "Build Your Own",
   "builder.editingPrebuilt": "Started from {name}. Change any part, then buy.",
@@ -143,7 +145,7 @@ const en: Dict = {
   "builder.conditionNew": "New",
   "builder.conditionUsed": "Used",
   "builder.usedBadge": "Used",
-  "builder.usedHint": "Used parts come from community sell listings approved by AXON.MK.",
+  "builder.usedHint": "Used parts are community listings plus ads from the last two weeks on Reklama5 and Pazar3.",
   "builder.noUsedParts": "No used parts in this category yet.",
   "builder.sellerLabel": "Seller: {name}",
   "builder.noParts": "No parts in this category.",
@@ -720,11 +722,13 @@ const sq: Dict = {
 
   "usedParts.title": "Pjesë të Përdorura",
   "usedParts.desc":
-    "Listime nga përdoruesit — aprovohen nga AXON.MK para se të shfaqen.",
+    "Listime nga përdoruesit, plus pjesë të përdorura të postuara në dy javët e fundit në Reklama5 dhe Pazar3.",
+  "usedParts.openAd": "Hap në {source}",
   "usedParts.sellCta": "Shit pjesën tënde",
   "usedParts.loading": "Duke u ngarkuar…",
   "usedParts.empty": "Ende nuk ka pjesë të listuara.",
   "usedParts.filterAll": "Të gjitha pjesët",
+  "usedParts.sourceAll": "Të gjitha burimet",
 
   "builder.title": "Ndërto Vetë",
   "builder.editingPrebuilt": "Nisur nga {name}. Ndrysho çdo pjesë, pastaj bli.",
@@ -756,7 +760,7 @@ const sq: Dict = {
   "builder.conditionNew": "Të reja",
   "builder.conditionUsed": "Të përdorura",
   "builder.usedBadge": "Përdorur",
-  "builder.usedHint": "Pjesët e përdorura vijnë nga listimet e komunitetit të aprovuara nga AXON.MK.",
+  "builder.usedHint": "Pjesët e përdorura janë listime të komunitetit plus njoftime nga dy javët e fundit në Reklama5 dhe Pazar3.",
   "builder.noUsedParts": "Nuk ka pjesë të përdorura në këtë kategori ende.",
   "builder.sellerLabel": "Shitësi: {name}",
   "builder.noParts": "Nuk ka pjesë në këtë kategori.",
@@ -1333,11 +1337,13 @@ const mk: Dict = {
 
   "usedParts.title": "Половни делови",
   "usedParts.desc":
-    "Објави од корисници — AXON.MK ги одобрува пред да се појават.",
+    "Објави од корисници, плус половни делови објавени во последните две недели на Reklama5 и Pazar3.",
+  "usedParts.openAd": "Отвори на {source}",
   "usedParts.sellCta": "Продај дел",
   "usedParts.loading": "Се вчитува…",
   "usedParts.empty": "Сè уште нема објавени делови.",
   "usedParts.filterAll": "Сите делови",
+  "usedParts.sourceAll": "Сите извори",
 
   "builder.title": "Склопи Сам",
   "builder.editingPrebuilt": "Почнато од {name}. Смени кој било дел, па купи.",
@@ -1369,7 +1375,7 @@ const mk: Dict = {
   "builder.conditionNew": "Нови",
   "builder.conditionUsed": "Половни",
   "builder.usedBadge": "Половен",
-  "builder.usedHint": "Половните делови доаѓаат од кориснички објави одобрени од AXON.MK.",
+  "builder.usedHint": "Половните делови се кориснички објави плус огласи од последните две недели на Reklama5 и Pazar3.",
   "builder.noUsedParts": "Сè уште нема половни делови во оваа категорија.",
   "builder.sellerLabel": "Продавач: {name}",
   "builder.noParts": "Нема делови во оваа категорија.",
