@@ -63,6 +63,41 @@ export function isStockCoolerPart(part: {
   return part.brand === "OEM" && /included stock cooler/i.test(part.name ?? "");
 }
 
+/**
+ * Cooling the catalog claims, corrected for coolers whose stored watt rating is too high.
+ * Arctic Alpine models are small top-blow fans, about 65W, even when the shop row says 180W.
+ */
+export function coolerCoolingWatts(part: {
+  name?: string | null;
+  brand?: string | null;
+  tdpWatts?: number | null;
+}): number | null {
+  const text = `${part.brand ?? ""} ${part.name ?? ""}`.toLowerCase();
+  if (/alpine/.test(text)) return 65;
+  return part.tdpWatts && part.tdpWatts > 0 ? part.tdpWatts : null;
+}
+
+function coolerTooWeak(cpu: CompatPart, cooler: CompatPart): boolean {
+  const capacity = coolerCoolingWatts(cooler);
+  const cpuTdp = cpu.tdpWatts && cpu.tdpWatts > 0 ? cpu.tdpWatts : null;
+  if (capacity && cpuTdp && capacity < cpuTdp) return true;
+  if (/alpine/i.test(`${cooler.brand ?? ""} ${cooler.name}`)) return false;
+  return Boolean(cpuNeedsCooler(cpu) && capacity && capacity < 100);
+}
+
+function coolerWeakMessage(cpu: CompatPart, cooler: CompatPart): string {
+  const coolerName = [cooler.brand, cooler.name].filter(Boolean).join(" ");
+  const cpuName = [cpu.brand, cpu.name].filter(Boolean).join(" ");
+  if (/alpine/i.test(coolerName)) {
+    return `${coolerName} is a small fan cooler and cannot cool the ${cpuName}. This CPU needs a tower cooler or a liquid cooler.`;
+  }
+  const capacity = coolerCoolingWatts(cooler);
+  if (cpuNeedsCooler(cpu) && capacity && capacity < 100) {
+    return "This CPU needs a proper heatsink cooler, not a stock-style fan cooler";
+  }
+  return `Cooler too weak: CPU ${cpu.tdpWatts}W TDP, cooler rated ${capacity}W`;
+}
+
 /** CPU needs a separate cooler (tray / WOF / many Ryzen 5 X SKUs). */
 export function cpuNeedsCooler(cpu: CompatPart | null | undefined): boolean {
   if (!cpu || isNonePart(cpu)) return false;
@@ -560,9 +595,12 @@ export function isCompatibleOption(
       return false;
     }
     const cpuTdp = cpu?.tdpWatts;
-    if (cpuTdp && part.tdpWatts && part.tdpWatts < cpuTdp) return false;
-    // Tray / WOF CPUs need a real heatsink cooler, not a tiny stock-style fan
-    if (cpu && cpuNeedsCooler(cpu) && part.tdpWatts && part.tdpWatts < 100) {
+    const capacity = coolerCoolingWatts(part);
+    if (cpuTdp && capacity && capacity < cpuTdp) return false;
+    // Tray / WOF CPUs need a real heatsink cooler, not a tiny stock-style fan.
+    // Alpine stays available for CPUs whose TDP is within its 65W rating.
+    const alpine = /alpine/i.test(`${part.brand ?? ""} ${part.name}`);
+    if (!alpine && cpu && cpuNeedsCooler(cpu) && capacity && capacity < 100) {
       return false;
     }
   }
@@ -751,24 +789,10 @@ export function checkCompatibility(
         severity: "error",
         message: "This CPU ships without a cooler — choose an aftermarket cooler",
       });
-    } else if (
-      cpuNeedsCooler(cpu) &&
-      cooler.tdpWatts &&
-      cooler.tdpWatts < 100
-    ) {
+    } else if (coolerTooWeak(cpu, cooler)) {
       issues.push({
         severity: "error",
-        message: "This CPU needs a proper heatsink cooler, not a stock-style fan cooler",
-      });
-    } else if (
-      !isStockCoolerPart(cooler) &&
-      cpu.tdpWatts &&
-      cooler.tdpWatts &&
-      cooler.tdpWatts < cpu.tdpWatts
-    ) {
-      issues.push({
-        severity: "error",
-        message: `Cooler too weak: CPU ${cpu.tdpWatts}W TDP, cooler rated ${cooler.tdpWatts}W`,
+        message: coolerWeakMessage(cpu, cooler),
       });
     }
   }

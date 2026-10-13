@@ -704,7 +704,7 @@ function estimateCoolerTdp(raw: string): number {
   if (/ag300|hyper\s*212/.test(n)) return 150;
   if (/ag200|iceedge|ice\s*edge/.test(n)) return 100;
   // Tiny stock-style / fan heatsinks — not enough for modern desktop CPUs
-  if (/gamma|archer|ck-?\s*115|ck-11509|ck11509/.test(n)) return 65;
+  if (/gamma|archer|ck-?\s*115|ck-11509|ck11509|alpine|low-profile/.test(n)) return 65;
   return 180;
 }
 

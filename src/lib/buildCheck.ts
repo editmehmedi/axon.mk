@@ -1,5 +1,6 @@
 import {
   checkCompatibility,
+  coolerCoolingWatts,
   cpuHasIntegratedGraphics,
   cpuNeedsCooler,
   getSsds,
@@ -23,7 +24,11 @@ function partLine(part: CompatPart): string {
     part.ramType ?? "",
     part.formFactor ?? "",
     part.wattage ? `${part.wattage}W` : "",
-    part.tdpWatts ? `TDP ${part.tdpWatts}W` : "",
+    part.category === "COOLER" && coolerCoolingWatts(part)
+      ? `cools about ${coolerCoolingWatts(part)}W`
+      : part.tdpWatts
+        ? `TDP ${part.tdpWatts}W`
+        : "",
     part.category === "CPU" ? (part.includesCooler ? "includes a stock cooler" : "no stock cooler") : "",
   ].filter(Boolean);
   const name = [part.brand, part.name].filter(Boolean).join(" ");
@@ -72,6 +77,7 @@ export async function explainBuild(
     "The issue list is already decided. Do not add a conflict, remove one, or call an error only a suggestion.",
     "If the issue list says none, the selected parts are compatible.",
     "Explain each error in plain language and say which part to change.",
+    "If the issue says a fan cooler cannot cool the CPU, say that cooler is not enough and the CPU needs a tower cooler or a liquid cooler.",
     "A warning is a caution, not a failure.",
     "Missing parts are notes, not conflicts, unless the issue list says otherwise.",
     `Reply in ${language}. Three to six sentences. No asterisks.`,
