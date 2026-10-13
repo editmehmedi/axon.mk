@@ -2,7 +2,7 @@ import { z } from "zod";
 import { answerChat, chatConfigured, isItConversation, localShopAnswer, refusalText } from "@/lib/itChat";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const bodySchema = z.object({
   locale: z.enum(["en", "sq", "mk"]).default("en"),
@@ -78,7 +78,13 @@ export async function POST(req: Request) {
           write(chunk);
         }
       } catch (error) {
-        console.error("[chat]", error);
+        const failure = error as { message?: string; status?: number; name?: string };
+        const message = (failure.message ?? String(error)).replace(/AIza[\w-]+|AQ\.[A-Za-z0-9_-]+/g, "[redacted]");
+        console.error("[chat] request failed", {
+          name: failure.name,
+          status: failure.status,
+          message: message.slice(0, 800),
+        });
       }
       try {
         controller.close();
