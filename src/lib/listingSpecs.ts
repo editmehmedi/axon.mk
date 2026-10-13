@@ -20,7 +20,7 @@ function namedSocket(text: string): string | null {
 /** Chipset → socket and RAM. LGA1700 boards exist as DDR4 or DDR5, so RAM stays unset. */
 const CHIPSETS: { re: RegExp; socket: string; ramType: string | null }[] = [
   { re: /\b(?:X870E|X870|B850|B840|X670E|X670|B650E|B650|A620)\b/i, socket: "AM5", ramType: "DDR5" },
-  { re: /\b(?:X570|B550|A520|X470|B450|X370|B350|A320)\b/i, socket: "AM4", ramType: "DDR4" },
+  { re: /\b(?:X570|B550|A520|X470|B450|X370|AB350|B350|A320)M?\b/i, socket: "AM4", ramType: "DDR4" },
   { re: /\b(?:Z890|B860|H810)\b/i, socket: "LGA1851", ramType: "DDR5" },
   { re: /\b(?:Z790|H770|B760|Z690|H670|B660|H610)\b/i, socket: "LGA1700", ramType: null },
   { re: /\b(?:Z590|H570|B560|H510|Z490|H470|B460|H410)\b/i, socket: "LGA1200", ramType: "DDR4" },

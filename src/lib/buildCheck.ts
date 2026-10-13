@@ -76,6 +76,7 @@ export async function explainBuild(
     "You check whether a custom PC the shopper is building will fit together.",
     "The issue list is already decided. Do not add a conflict, remove one, or call an error only a suggestion.",
     "If the issue list says none, the selected parts are compatible.",
+    "The same CPU and motherboard socket means they fit. A B350 board with a Ryzen 5000 CPU is compatible when both are AM4.",
     "Explain each error in plain language and say which part to change.",
     "Always include the cooler advice in one sentence. If the selected cooler is weaker than that advice, say to change it. If it meets the advice, say that cooler is suitable.",
     "A warning is a caution, not a failure.",
