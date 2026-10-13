@@ -26,6 +26,7 @@ const en: Dict = {
   "nav.closeMenu": "Close menu",
   "nav.profile": "Profile",
   "nav.saved": "Saved PCs",
+  "nav.chat": "AI Chat",
 
   "footer.tagline": "Custom PC assembly · Cash on Delivery · North Macedonia",
   "footer.terms": "Terms",
@@ -623,6 +624,19 @@ const en: Dict = {
   "ai.error.low": "That budget is too low for a full PC. Try at least {amount}.",
   "ai.error.none": "We couldn’t build a compatible PC at this budget with what’s in stock.",
   "ai.error.generic": "Something went wrong. Try again.",
+
+  "chat.title": "Ask about PCs and IT",
+  "chat.desc": "Builds, parts, compatibility, and computer problems. Nothing else.",
+  "chat.welcome": "I help with PC builds, parts, and IT. Ask about a budget, a part, or a problem with your computer.",
+  "chat.placeholder": "Ask about a build, a part, or a computer problem",
+  "chat.send": "Send",
+  "chat.thinking": "Thinking…",
+  "chat.suggest1": "Gaming PC around 60,000 ден",
+  "chat.suggest2": "Which CPU fits an AM5 motherboard?",
+  "chat.suggest3": "My PC is slow. What should I check?",
+  "chat.error": "I couldn't answer just now. Try again.",
+  "chat.offline": "The assistant isn't connected yet.",
+  "chat.rate": "Too many messages. Wait a few minutes and try again.",
 };
 
 const sq: Dict = {
@@ -641,6 +655,7 @@ const sq: Dict = {
   "nav.closeMenu": "Mbyll menunë",
   "nav.profile": "Profili",
   "nav.saved": "PC të ruajtura",
+  "nav.chat": "Bisedë AI",
 
   "footer.tagline": "Montim PC custom · Pagesë në dorëzim · Maqedonia e Veriut",
   "footer.terms": "Kushtet",
@@ -1238,6 +1253,19 @@ const sq: Dict = {
   "ai.error.low": "Buxheti është shumë i ulët për një PC të plotë. Provo të paktën {amount}.",
   "ai.error.none": "Nuk mundëm të ndërtojmë një PC të pajtueshëm me këtë buxhet nga stoku aktual.",
   "ai.error.generic": "Diçka shkoi keq. Provo përsëri.",
+
+  "chat.title": "Pyet për PC dhe IT",
+  "chat.desc": "Sklopje, pjesë, përputhje dhe probleme me kompjuterin. Asgjë tjetër.",
+  "chat.welcome": "Ndihmoj me sklopje PC-je, pjesë dhe IT. Pyet për buxhet, një pjesë ose një problem me kompjuterin.",
+  "chat.placeholder": "Pyet për një sklopje, një pjesë ose një problem me kompjuterin",
+  "chat.send": "Dërgo",
+  "chat.thinking": "Po mendoj…",
+  "chat.suggest1": "PC për lojëra rreth 60.000 den",
+  "chat.suggest2": "Cili procesor hyn në pllakë AM5?",
+  "chat.suggest3": "PC-ja është e ngadaltë. Çfarë të kontrolloj?",
+  "chat.error": "Nuk munda të përgjigjem tani. Provo përsëri.",
+  "chat.offline": "Asistenti nuk është i lidhur ende.",
+  "chat.rate": "Shumë mesazhe. Prit disa minuta dhe provo përsëri.",
 };
 
 const mk: Dict = {
@@ -1256,6 +1284,7 @@ const mk: Dict = {
   "nav.closeMenu": "Затвори мени",
   "nav.profile": "Профил",
   "nav.saved": "Зачувани PC",
+  "nav.chat": "AI Чет",
 
   "footer.tagline": "Custom PC assembly · Cash on Delivery · Северна Македонија",
   "footer.terms": "Услови",
@@ -1853,6 +1882,19 @@ const mk: Dict = {
   "ai.error.low": "Буџетот е пренизок за целосен PC. Пробај барем {amount}.",
   "ai.error.none": "Не можеме да склопиме компатибилен PC за овој буџет од моменталната залиха.",
   "ai.error.generic": "Нешто тргна наопаку. Обиди се повторно.",
+
+  "chat.title": "Прашај за PC и IT",
+  "chat.desc": "Склопови, делови, компатибилност и проблеми со компјутер. Ништо друго.",
+  "chat.welcome": "Помагам за склопување PC, делови и IT. Прашај за буџет, дел или проблем со компјутерот.",
+  "chat.placeholder": "Прашај за склоп, дел или проблем со компјутерот",
+  "chat.send": "Испрати",
+  "chat.thinking": "Размислувам…",
+  "chat.suggest1": "Гејминг PC околу 60.000 ден",
+  "chat.suggest2": "Кој процесор одговара на AM5 плоча?",
+  "chat.suggest3": "PC-то е бавно. Што да проверам?",
+  "chat.error": "Не можам да одговорам сега. Обиди се повторно.",
+  "chat.offline": "Асистентот сè уште не е поврзан.",
+  "chat.rate": "Премногу пораки. Почекај неколку минути и обиди се повторно.",
 };
 
 export const dictionaries: Record<Locale, Dict> = { en, sq, mk };
