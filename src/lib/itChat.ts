@@ -487,46 +487,90 @@ function chipIds(text: string): string[] {
   return found;
 }
 
+function askedGame(text: string): string | null {
+  const folded = fold(text);
+  if (/\bcs\s?2\b|csgo|counter[\s-]?strike|контра|кс\s?2|цс\s?2/.test(folded)) return "CS2";
+  if (/valorant/.test(folded)) return "Valorant";
+  if (/fortnite/.test(folded)) return "Fortnite";
+  if (/warzone|call of duty|\bcod\b/.test(folded)) return "Warzone";
+  return null;
+}
+
+function wantsFpsCompare(text: string): boolean {
+  return askedGame(text) !== null || /fps|frame|кадр|кадар/.test(fold(text));
+}
+
+function recentChipPair(messages: ChatTurn[]): string[] | null {
+  const users = messages.filter((message) => message.role === "user");
+  for (let index = users.length - 1; index >= 0; index -= 1) {
+    const ids = chipIds(users[index].content);
+    if (ids.length >= 2) return ids.slice(0, 2);
+  }
+  return null;
+}
+
 function compareCpus(messages: ChatTurn[], locale: Locale): string | null {
-  const question = messages.filter((message) => message.role === "user").at(-1)?.content ?? "";
-  const ids = chipIds(question);
-  if (ids.length < 2) return null;
+  const users = messages.filter((message) => message.role === "user");
+  const question = users.at(-1)?.content ?? "";
+  let ids = chipIds(question);
+  const game = askedGame(question);
+  if (ids.length < 2) {
+    if (!wantsFpsCompare(question)) return null;
+    const pair = recentChipPair(users.slice(0, -1));
+    if (!pair) return null;
+    ids = pair;
+  }
   const left = CHIPS[ids[0]];
   const right = CHIPS[ids[1]];
   const faster = left.gaming >= right.gaming ? left : right;
   const slower = faster === left ? right : left;
-  const owned = chipIds(
-    messages
-      .filter((message) => message.role === "user")
-      .slice(0, -1)
-      .map((message) => message.content)
-      .join(" "),
-  );
+  const owned = users
+    .slice(0, -1)
+    .filter((message) => /i have|i've got|\bmy\b|имам|\bimam\b|e kam|\bkam\b/i.test(message.content))
+    .flatMap((message) => chipIds(message.content));
   const ownsSlower = owned.includes(ids.find((id) => CHIPS[id] === slower) ?? "");
   const sameBoard = left.socket === right.socket;
+  const am5Step =
+    game === "CS2" && ownsSlower && slower.socket === "AM5" && slower.gaming < CHIPS["7800x3d"].gaming;
   if (locale === "mk") {
-    const fps = `${faster.name} обично дава повеќе FPS во игри од ${slower.name}, најмногу на 1080p.`;
+    const fps = game === "CS2"
+      ? `Во CS2 на 1080p, ${faster.name} е пред ${slower.name} со поголема разлика од во повеќето игри. CS2 го сака кешот, па просекот и падовите се подобри кога графичката не е граница.`
+      : game
+        ? `Во ${game} на 1080p, ${faster.name} е пред ${slower.name}. Разликата се намалува ако графичката е граница.`
+        : `${faster.name} обично дава повеќе FPS во игри од ${slower.name}, најмногу на 1080p.`;
     const board = sameBoard
       ? `Двата се ${left.socket}, па посилниот влегува на истата плоча. Ажурирај го BIOS пред замена.`
       : `${left.name} е ${left.socket} ${left.ram}, а ${right.name} е ${right.socket} ${right.ram}. Не влегуваат на иста плоча.`;
-    const keep = ownsSlower && !sameBoard ? ` Ако веќе го имаш ${slower.name}, не менувај на ${faster.name}. За повеќе FPS остани на ${slower.socket}.` : "";
+    const keep = ownsSlower && !sameBoard
+      ? ` Ако веќе го имаш ${slower.name}, не менувај на ${faster.name}.${am5Step ? " За повеќе FPS во CS2 остани на AM5 и земи Ryzen 7 7800X3D." : ` За повеќе FPS остани на ${slower.socket}.`}`
+      : "";
     return `${fps} ${board}${keep}`;
   }
   if (locale === "sq") {
-    const fps = `${faster.name} zakonisht jep më shumë FPS në lojëra se ${slower.name}, sidomos në 1080p.`;
+    const fps = game === "CS2"
+      ? `Në CS2 në 1080p, ${faster.name} është para ${slower.name} me një diferencë më të madhe se në shumicën e lojërave. CS2 e do cache-in, kështu që mesatarja dhe uljet janë më të mira kur kartela nuk është kufiri.`
+      : game
+        ? `Në ${game} në 1080p, ${faster.name} është para ${slower.name}. Diferenca bie nëse kartela është kufiri.`
+        : `${faster.name} zakonisht jep më shumë FPS në lojëra se ${slower.name}, sidomos në 1080p.`;
     const board = sameBoard
       ? `Të dy janë ${left.socket}, kështu që më i forti hyn në të njëjtën pllakë. Përditëso BIOS para se ta ndërrosh.`
       : `${left.name} është ${left.socket} ${left.ram}, ndërsa ${right.name} është ${right.socket} ${right.ram}. Nuk hyjnë në të njëjtën pllakë.`;
-    const keep = ownsSlower && !sameBoard ? ` Nëse e ke tashmë ${slower.name}, mos kalo te ${faster.name}. Për më shumë FPS qëndro te ${slower.socket}.` : "";
+    const keep = ownsSlower && !sameBoard
+      ? ` Nëse e ke tashmë ${slower.name}, mos kalo te ${faster.name}.${am5Step ? " Për më shumë FPS në CS2 qëndro te AM5 dhe merr një Ryzen 7 7800X3D." : ` Për më shumë FPS qëndro te ${slower.socket}.`}`
+      : "";
     return `${fps} ${board}${keep}`;
   }
-  const fps = `For gaming FPS, the ${faster.name} is ahead of the ${slower.name}, mostly at 1080p.`;
+  const fps = game === "CS2"
+    ? `In CS2 at 1080p, the ${faster.name} is ahead of the ${slower.name} by more than in most games. CS2 likes the extra cache, so the average and the lows are higher when the graphics card is not the limit.`
+    : game
+      ? `In ${game} at 1080p, the ${faster.name} is ahead of the ${slower.name}. The gap shrinks when the graphics card is the limit.`
+      : `For gaming FPS, the ${faster.name} is ahead of the ${slower.name}, mostly at 1080p.`;
   const board = sameBoard
     ? `Both use ${left.socket}, so the faster one fits the same motherboard. Update the BIOS before you swap.`
     : `The ${left.name} is ${left.socket} with ${left.ram}. The ${right.name} is ${right.socket} with ${right.ram}. They do not fit the same motherboard.`;
   const keep =
     ownsSlower && !sameBoard
-      ? ` You already have the ${slower.name}, so a ${faster.name} is not an upgrade. It needs a different board and memory. For more FPS, stay on ${slower.socket}.`
+      ? ` You already have the ${slower.name}, so a ${faster.name} is not an upgrade. It needs a different board and memory.${am5Step ? " For more CS2 FPS, stay on AM5 and get a Ryzen 7 7800X3D." : ` For more FPS, stay on ${slower.socket}.`}`
       : "";
   return `${fps} ${board}${keep}`;
 }
