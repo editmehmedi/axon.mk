@@ -7,29 +7,60 @@ type Turn = { role: "user" | "assistant"; content: string };
 
 const LINK = /(https?:\/\/[^\s)]+|\/(?:configurator|ai-build|prebuilts|used-parts|used|sell|chat)\b)/g;
 
-function MessageText({ text }: { text: string }) {
-  const parts = text.split(LINK);
+function InlineText({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
   return (
     <>
       {parts.map((part, index) => {
         if (!part) return null;
-        if (/^https?:\/\//.test(part)) {
-          return (
-            <a key={index} href={part} className="underline decoration-[var(--cyan)]/50" target="_blank" rel="noreferrer">
-              {part}
-            </a>
-          );
+        if (part.startsWith("**") && part.endsWith("**")) {
+          return <strong key={index}>{part.slice(2, -2)}</strong>;
         }
-        if (part.startsWith("/")) {
-          return (
-            <a key={index} href={part} className="text-[var(--cyan)] underline decoration-[var(--cyan)]/40">
-              {part}
-            </a>
-          );
-        }
-        return <span key={index}>{part}</span>;
+        const links = part.split(LINK);
+        return links.map((link, linkIndex) => {
+          if (!link) return null;
+          if (/^https?:\/\//.test(link)) {
+            return (
+              <a key={`${index}-${linkIndex}`} href={link} className="underline decoration-[var(--cyan)]/50" target="_blank" rel="noreferrer">
+                {link}
+              </a>
+            );
+          }
+          if (link.startsWith("/")) {
+            return (
+              <a key={`${index}-${linkIndex}`} href={link} className="text-[var(--cyan)] underline decoration-[var(--cyan)]/40">
+                {link}
+              </a>
+            );
+          }
+          return <span key={`${index}-${linkIndex}`}>{link}</span>;
+        });
       })}
     </>
+  );
+}
+
+function MessageText({ text }: { text: string }) {
+  const lines = text.split("\n");
+  return (
+    <div className="space-y-1">
+      {lines.map((line, index) => {
+        const item = line.match(/^\s*(?:[-*]|\d+\.)\s+(.*)$/);
+        if (item) {
+          return (
+            <p key={index} className="pl-3">
+              <InlineText text={item[1]} />
+            </p>
+          );
+        }
+        if (!line.trim()) return <div key={index} className="h-2" />;
+        return (
+          <p key={index}>
+            <InlineText text={line} />
+          </p>
+        );
+      })}
+    </div>
   );
 }
 
@@ -58,7 +89,10 @@ export function ItChat() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           locale,
-          messages: history.map((message) => ({ role: message.role, content: message.content })),
+          messages: history.map((message) => ({
+            role: message.role,
+            content: message.content.slice(0, 4000),
+          })),
         }),
       });
       if (response.status === 503) {
@@ -142,7 +176,7 @@ export function ItChat() {
             messages.map((message, index) => (
               <div key={`${message.role}-${index}`} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div
-                  className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-6 ${
+                  className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-6 ${
                     message.role === "user"
                       ? "bg-[rgba(34,211,238,0.16)] text-[var(--text)]"
                       : "border border-[var(--border)] bg-[rgba(7,11,18,0.45)] text-[var(--text)]"

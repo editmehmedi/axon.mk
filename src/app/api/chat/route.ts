@@ -10,7 +10,7 @@ const bodySchema = z.object({
     .array(
       z.object({
         role: z.enum(["user", "assistant"]),
-        content: z.string().trim().min(1).max(1200),
+        content: z.string().trim().min(1).max(8000),
       }),
     )
     .min(1)
@@ -69,14 +69,30 @@ export async function POST(req: Request) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
+      let sent = false;
+      const write = (text: string) => {
+        if (!text) return;
+        controller.enqueue(encoder.encode(text));
+        sent = true;
+      };
       try {
         for await (const chunk of answerChat(body.locale, body.messages)) {
-          controller.enqueue(encoder.encode(chunk));
+          write(chunk);
         }
       } catch (error) {
         console.error("[chat]", error);
-      } finally {
+      }
+      if (!sent) {
+        try {
+          write(await localShopAnswer(body.locale, body.messages));
+        } catch (error) {
+          console.error("[chat local]", error);
+        }
+      }
+      try {
         controller.close();
+      } catch {
+        // The browser already stopped reading.
       }
     },
   });
