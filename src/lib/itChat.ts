@@ -459,6 +459,78 @@ async function partsMatching(question: string): Promise<string> {
   return ["Parts matching the question:", ...lines].join("\n");
 }
 
+const CHIPS: Record<string, { name: string; socket: string; ram: string; gaming: number }> = {
+  "5600": { name: "Ryzen 5 5600", socket: "AM4", ram: "DDR4", gaming: 70 },
+  "5700x": { name: "Ryzen 7 5700X", socket: "AM4", ram: "DDR4", gaming: 74 },
+  "5700x3d": { name: "Ryzen 7 5700X3D", socket: "AM4", ram: "DDR4", gaming: 88 },
+  "5800x3d": { name: "Ryzen 7 5800X3D", socket: "AM4", ram: "DDR4", gaming: 90 },
+  "7500f": { name: "Ryzen 5 7500F", socket: "AM5", ram: "DDR5", gaming: 84 },
+  "7600": { name: "Ryzen 5 7600", socket: "AM5", ram: "DDR5", gaming: 85 },
+  "7600x": { name: "Ryzen 5 7600X", socket: "AM5", ram: "DDR5", gaming: 86 },
+  "7700": { name: "Ryzen 7 7700", socket: "AM5", ram: "DDR5", gaming: 87 },
+  "7800x3d": { name: "Ryzen 7 7800X3D", socket: "AM5", ram: "DDR5", gaming: 100 },
+  "9600x": { name: "Ryzen 5 9600X", socket: "AM5", ram: "DDR5", gaming: 90 },
+  "9800x3d": { name: "Ryzen 7 9800X3D", socket: "AM5", ram: "DDR5", gaming: 108 },
+  "12400f": { name: "Core i5-12400F", socket: "LGA1700", ram: "DDR4 or DDR5", gaming: 78 },
+  "13400f": { name: "Core i5-13400F", socket: "LGA1700", ram: "DDR4 or DDR5", gaming: 82 },
+  "14100f": { name: "Core i3-14100F", socket: "LGA1700", ram: "DDR4 or DDR5", gaming: 72 },
+};
+
+function chipIds(text: string): string[] {
+  let rest = fold(text).replace(/[^a-z0-9]+/g, "");
+  const found: string[] = [];
+  for (const key of Object.keys(CHIPS).sort((a, b) => b.length - a.length)) {
+    if (!rest.includes(key)) continue;
+    found.push(key);
+    rest = rest.replace(key, "");
+  }
+  return found;
+}
+
+function compareCpus(messages: ChatTurn[], locale: Locale): string | null {
+  const question = messages.filter((message) => message.role === "user").at(-1)?.content ?? "";
+  const ids = chipIds(question);
+  if (ids.length < 2) return null;
+  const left = CHIPS[ids[0]];
+  const right = CHIPS[ids[1]];
+  const faster = left.gaming >= right.gaming ? left : right;
+  const slower = faster === left ? right : left;
+  const owned = chipIds(
+    messages
+      .filter((message) => message.role === "user")
+      .slice(0, -1)
+      .map((message) => message.content)
+      .join(" "),
+  );
+  const ownsSlower = owned.includes(ids.find((id) => CHIPS[id] === slower) ?? "");
+  const sameBoard = left.socket === right.socket;
+  if (locale === "mk") {
+    const fps = `${faster.name} обично дава повеќе FPS во игри од ${slower.name}, најмногу на 1080p.`;
+    const board = sameBoard
+      ? `Двата се ${left.socket}, па посилниот влегува на истата плоча. Ажурирај го BIOS пред замена.`
+      : `${left.name} е ${left.socket} ${left.ram}, а ${right.name} е ${right.socket} ${right.ram}. Не влегуваат на иста плоча.`;
+    const keep = ownsSlower && !sameBoard ? ` Ако веќе го имаш ${slower.name}, не менувај на ${faster.name}. За повеќе FPS остани на ${slower.socket}.` : "";
+    return `${fps} ${board}${keep}`;
+  }
+  if (locale === "sq") {
+    const fps = `${faster.name} zakonisht jep më shumë FPS në lojëra se ${slower.name}, sidomos në 1080p.`;
+    const board = sameBoard
+      ? `Të dy janë ${left.socket}, kështu që më i forti hyn në të njëjtën pllakë. Përditëso BIOS para se ta ndërrosh.`
+      : `${left.name} është ${left.socket} ${left.ram}, ndërsa ${right.name} është ${right.socket} ${right.ram}. Nuk hyjnë në të njëjtën pllakë.`;
+    const keep = ownsSlower && !sameBoard ? ` Nëse e ke tashmë ${slower.name}, mos kalo te ${faster.name}. Për më shumë FPS qëndro te ${slower.socket}.` : "";
+    return `${fps} ${board}${keep}`;
+  }
+  const fps = `For gaming FPS, the ${faster.name} is ahead of the ${slower.name}, mostly at 1080p.`;
+  const board = sameBoard
+    ? `Both use ${left.socket}, so the faster one fits the same motherboard. Update the BIOS before you swap.`
+    : `The ${left.name} is ${left.socket} with ${left.ram}. The ${right.name} is ${right.socket} with ${right.ram}. They do not fit the same motherboard.`;
+  const keep =
+    ownsSlower && !sameBoard
+      ? ` You already have the ${slower.name}, so a ${faster.name} is not an upgrade. It needs a different board and memory. For more FPS, stay on ${slower.socket}.`
+      : "";
+  return `${fps} ${board}${keep}`;
+}
+
 export async function* answerChat(locale: Locale, messages: ChatTurn[]): AsyncGenerator<string> {
   if (!isItConversation(messages)) {
     yield refusalText(locale);
@@ -469,6 +541,11 @@ export async function* answerChat(locale: Locale, messages: ChatTurn[]): AsyncGe
   if (!geminiKey && !openAiKey) throw new Error("offline");
 
   const question = messages.filter((message) => message.role === "user").at(-1)?.content ?? "";
+  const compared = compareCpus(messages, locale);
+  if (compared) {
+    yield compared;
+    return;
+  }
   const quick = playbook(question, locale);
   if (quick) {
     yield quick;
@@ -499,6 +576,7 @@ export async function* answerChat(locale: Locale, messages: ChatTurn[]): AsyncGe
       : locale === "sq"
         ? "Është e ngadaltë tani. Pyet edhe një herë."
         : "That's slow right now. Ask once more.";
+    return;
   }
   yield* openAiText(system, messages);
 }
