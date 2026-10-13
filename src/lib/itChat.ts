@@ -49,6 +49,20 @@ export function refusalText(locale: Locale): string {
   return REFUSAL[locale] ?? REFUSAL.en;
 }
 
+function greetingText(text: string, locale: Locale): string | null {
+  const trimmed = text.trim();
+  if (!GREETING.test(trimmed)) return null;
+  const thanks = /^(thanks|thank you|fala|фала|blagodaram|благодар)[!.?\s]*$/i.test(trimmed);
+  if (thanks) {
+    if (locale === "mk") return "Нема на што. Прашај за склоп, дел или проблем со компјутер.";
+    if (locale === "sq") return "S'ka përse. Pyet për një sklop, një pjesë ose një problem me kompjuterin.";
+    return "You're welcome. Ask about a build, a part, or a computer problem.";
+  }
+  if (locale === "mk") return "Здраво. Прашај за склоп, дел или проблем со компјутер.";
+  if (locale === "sq") return "Përshëndetje. Pyet për një sklop, një pjesë ose një problem me kompjuterin.";
+  return "Hi. Ask me about a PC build, a part, or a computer problem.";
+}
+
 function fold(text: string): string {
   return text.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
 }
@@ -663,11 +677,16 @@ export async function* answerChat(locale: Locale, messages: ChatTurn[]): AsyncGe
     yield refusalText(locale);
     return;
   }
+  const question = messages.filter((message) => message.role === "user").at(-1)?.content ?? "";
+  const greeting = greetingText(question, locale);
+  if (greeting) {
+    yield greeting;
+    return;
+  }
   const geminiKey = process.env.GEMINI_API_KEY?.trim();
   const openAiKey = process.env.AI_API_KEY?.trim();
   if (!geminiKey && !openAiKey) throw new Error("offline");
 
-  const question = messages.filter((message) => message.role === "user").at(-1)?.content ?? "";
   const compared = compareCpus(messages, locale);
   if (compared) {
     yield compared;
