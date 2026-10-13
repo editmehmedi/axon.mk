@@ -1,8 +1,9 @@
 import { identifyCpu, identifyGpu } from "@/lib/chipCatalog";
 import {
   checkCompatibility,
+  coolerCoolingWatts,
+  cpuCoolerPlan,
   cpuHasIntegratedGraphics,
-  cpuNeedsCooler,
   filterCompatibleParts,
   getSsds,
   hasBlockingErrors,
@@ -260,17 +261,16 @@ function completeBuild(
   let remaining = partsBudget - priceOf(cpu) - priceOf(gpu);
   if (remaining < 8000) return null;
 
-  if (!cpuNeedsCooler(cpu)) {
+  const coolerPlan = cpuCoolerPlan(cpu);
+  if (coolerPlan.tier === "stock") {
     const stock = catalog.find((part) => part.category === "COOLER" && isStockCoolerPart(part));
     if (stock) sel.COOLER = stock;
   } else {
-    const cpuTdp = cpu.tdpWatts ?? 65;
     const fitsCooler = (part: AiCatalogPart, priceCap: number) => {
       if (!buyable(part) || part.priceMkd > priceCap) return false;
-      const capacity = coolerCapacity(part);
-      if (capacity != null && capacity < cpuTdp) return false;
-      if (capacity == null && cpuTdp >= 105) return false;
-      if (cpuTdp >= 90 && /alpine|low-profile|\blp\b/i.test(part.name)) return false;
+      const capacity = coolerCoolingWatts(part);
+      if (capacity != null && capacity < coolerPlan.minWatts) return false;
+      if (capacity == null && coolerPlan.minWatts > 65) return false;
       return true;
     };
     const coolers = filterCompatibleParts(catalog, "COOLER", sel).filter((part) =>
@@ -422,14 +422,6 @@ function pairOk(cpu: AiCatalogPart, gpu: AiCatalogPart, useCase: AiUseCase, rela
   const ratio = useCase === "work" ? 0.55 : useCase === "content" ? 0.7 : 0.8;
   const floor = relaxed ? ratio - 0.12 : ratio;
   return cpuR >= gpuR * floor;
-}
-
-function coolerCapacity(part: AiCatalogPart): number | null {
-  const fromName = part.name.match(/(\d{2,3})\s*W\b/i);
-  const named = fromName ? Number(fromName[1]) : null;
-  const rated = part.tdpWatts && part.tdpWatts > 0 ? part.tdpWatts : null;
-  if (named && rated) return Math.min(named, rated);
-  return named ?? rated;
 }
 
 function ramSpeedMhz(name: string): number {

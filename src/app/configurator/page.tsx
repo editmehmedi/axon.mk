@@ -6,6 +6,7 @@ import { ASSEMBLY_FEE_DEFAULT, BUILDER_STEPS } from "@/lib/constants";
 import {
   checkCompatibility,
   compatibilityFilterHint,
+  cpuCoolerPlan,
   createNonePart,
   cpuHasIntegratedGraphics,
   cpuNeedsCooler,
@@ -1430,6 +1431,13 @@ export default function ConfiguratorPage() {
             {slotWarning && (
               <p className="mt-2 text-sm font-medium text-[var(--warn)]">{slotWarning}</p>
             )}
+            {selectedCpu ? (
+              <p className="mt-3 text-sm text-[var(--cyan)]">
+                {t("builder.coolerFor", {
+                  advice: t(`builder.cooler.${cpuCoolerPlan(selectedCpu).tier}`),
+                })}
+              </p>
+            ) : null}
             <BuildCompatCheck
               selection={selection}
               ramQty={selectedRamQty}

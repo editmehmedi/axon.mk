@@ -1,8 +1,8 @@
 import {
   checkCompatibility,
   coolerCoolingWatts,
+  cpuCoolerPlan,
   cpuHasIntegratedGraphics,
-  cpuNeedsCooler,
   getSsds,
   hasRealPsu,
   isNonePart,
@@ -53,8 +53,8 @@ function missingNotes(selection: CompatSelection): string[] {
   if (cpu && !real(selection.GPU) && !cpuHasIntegratedGraphics(cpu)) {
     notes.push("No graphics card is selected, and this CPU has no integrated graphics.");
   }
-  if (cpuNeedsCooler(cpu) && !real(selection.COOLER)) {
-    notes.push("This CPU does not include a cooler, and no cooler is selected.");
+  if (cpu && (!real(selection.COOLER) || cpuCoolerPlan(cpu).tier !== "stock")) {
+    notes.push(`Cooler advice: use ${cpuCoolerPlan(cpu).recommendation}`);
   }
   if (getSsds(selection).length === 0) notes.push("Storage is not selected.");
   return notes;
@@ -77,7 +77,7 @@ export async function explainBuild(
     "The issue list is already decided. Do not add a conflict, remove one, or call an error only a suggestion.",
     "If the issue list says none, the selected parts are compatible.",
     "Explain each error in plain language and say which part to change.",
-    "If the issue says a fan cooler cannot cool the CPU, say that cooler is not enough and the CPU needs a tower cooler or a liquid cooler.",
+    "Always include the cooler advice in one sentence. If the selected cooler is weaker than that advice, say to change it. If it meets the advice, say that cooler is suitable.",
     "A warning is a caution, not a failure.",
     "Missing parts are notes, not conflicts, unless the issue list says otherwise.",
     `Reply in ${language}. Three to six sentences. No asterisks.`,
