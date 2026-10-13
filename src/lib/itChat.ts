@@ -1,3 +1,4 @@
+import { fetch as geminiFetch } from "undici";
 import { buildAiPc, type AiCatalogPart, type AiUseCase } from "@/lib/aiBuild";
 import { ASSEMBLY_FEE_DEFAULT, formatMkd } from "@/lib/constants";
 import { FALLBACK_RATES } from "@/lib/currency";
@@ -75,15 +76,6 @@ export function isItConversation(messages: ChatTurn[]): boolean {
   return text.length <= 24 && !offTopic;
 }
 
-function spread<T>(items: T[], count: number): T[] {
-  if (items.length <= count) return items;
-  const picked: T[] = [];
-  for (let i = 0; i < count; i += 1) {
-    picked.push(items[Math.round((i * (items.length - 1)) / (count - 1))]);
-  }
-  return picked;
-}
-
 async function shopBrief(): Promise<string> {
   const now = Date.now();
   if (shopCache && now - shopCache.at < 5 * 60 * 1000) return shopCache.text;
@@ -132,31 +124,24 @@ async function shopBrief(): Promise<string> {
     "Compatibility: CPU and motherboard sockets must match. RAM type must match the platform. Cooler must support the CPU socket and TDP. PSU wattage must cover the build. Case must fit the motherboard and GPU.",
     "Only quote parts and prices from the lists below. If something is not listed, say it is not in stock here and send the buyer to /configurator.",
     "",
-    "In-stock parts (a price spread, not the full catalog):",
+    "In-stock price range. Quote a specific part only if it is listed under parts matching the question.",
   ];
 
   const categories = ["CPU", "COOLER", "MOTHERBOARD", "RAM", "GPU", "PSU", "CASE", "SSD"] as const;
   for (const category of categories) {
     const rows = parts.filter((part) => part.category === category);
-    lines.push(`${category}: ${rows.length} in stock`);
-    for (const part of spread(rows, 8)) {
-      const specs = [
-        part.socket,
-        part.ramType,
-        part.wattage ? `${part.wattage}W` : "",
-        part.tdpWatts ? `${part.tdpWatts}W TDP` : "",
-        part.formFactor,
-        part.category === "CPU" ? (part.includesCooler ? "includes stock cooler" : "no stock cooler") : "",
-      ]
-        .filter(Boolean)
-        .join(", ");
-      lines.push(`- ${part.brand} ${part.name} | ${formatMkd(part.priceMkd)} | stock ${part.stock}${specs ? ` | ${specs}` : ""}`);
+    if (rows.length === 0) {
+      lines.push(`${category}: none in stock`);
+      continue;
     }
+    const low = rows[0];
+    const high = rows[rows.length - 1];
+    lines.push(`${category}: ${rows.length} in stock, ${formatMkd(low.priceMkd)} to ${formatMkd(high.priceMkd)}`);
   }
 
   lines.push("", "Ready PCs in stock:");
   if (prebuilts.length === 0) lines.push("- none");
-  for (const pc of prebuilts) {
+  for (const pc of prebuilts.slice(0, 4)) {
     lines.push(`- ${pc.name} | ${formatMkd(pc.priceMkd)} | ${pc.condition} | ${pc.cpuLabel} / ${pc.gpuLabel} / ${pc.ramLabel} / ${pc.ssdLabel}`);
   }
 
@@ -183,56 +168,40 @@ function systemPrompt(shop: string, locale: Locale): string {
 }
 
 async function* geminiText(model: string, key: string, system: string, messages: ChatTurn[]): AsyncGenerator<string> {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`,
+  const recent = messages.slice(-4).map((message) => ({
+    role: message.role,
+    content: message.content.slice(0, 700),
+  }));
+  const response = await geminiFetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
       method: "POST",
+      signal: AbortSignal.timeout(8000),
       headers: {
         "Content-Type": "application/json",
         "x-goog-api-key": key,
       },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
-        contents: messages.map((message) => ({
+        contents: recent.map((message) => ({
           role: message.role === "assistant" ? "model" : "user",
           parts: [{ text: message.content }],
         })),
-        generationConfig: { temperature: 0.4, maxOutputTokens: 900, thinkingConfig: { thinkingBudget: 0 } },
+        generationConfig: { temperature: 0.3, maxOutputTokens: 280, thinkingConfig: { thinkingBudget: 0 } },
       }),
     },
   );
-  if (!response.ok || !response.body) {
-    const detail = await response.text().catch(() => "");
-    throw new Error(`gemini ${response.status} ${detail.slice(0, 240)}`);
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const rows = buffer.split("\n");
-    buffer = rows.pop() ?? "";
-    for (const row of rows) {
-      const line = row.trim();
-      if (!line.startsWith("data:")) continue;
-      const data = line.slice(5).trim();
-      if (!data || data === "[DONE]") continue;
-      try {
-        const json = JSON.parse(data) as {
-          candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[];
-        };
-        for (const part of json.candidates?.[0]?.content?.parts ?? []) {
-          if (part.thought || !part.text) continue;
-          yield part.text;
-        }
-      } catch {
-        // Keep reading if a chunk splits a JSON line.
-      }
-    }
-  }
+  const body = await response.text();
+  if (!response.ok) throw new Error(`gemini ${response.status} ${body.slice(0, 240)}`);
+  const json = JSON.parse(body) as {
+    candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[];
+  };
+  const text = (json.candidates?.[0]?.content?.parts ?? [])
+    .filter((part) => !part.thought && part.text)
+    .map((part) => part.text)
+    .join("");
+  if (!text.trim()) throw new Error("gemini empty");
+  yield text;
 }
 
 async function* openAiText(system: string, messages: ChatTurn[]): AsyncGenerator<string> {
@@ -366,6 +335,11 @@ function playbook(text: string, locale: Locale): string | null {
     },
   };
   const pack = guides[locale] ?? guides.en;
+  if (/ddr\s?5/.test(folded) && /fps|worth|вред|vlen|ia vlen|perf/.test(folded)) {
+    if (locale === "sq") return "DDR5 vetëm nuk shton shumë FPS. Në lojëra kartela grafike vendos më shumë. Ndërrimi nga DDR4 në DDR5 kërkon pllakë të re dhe memorie të re. Po të njëjtat para zakonisht japin më shumë FPS te kartela grafike.";
+    if (locale === "mk") return "DDR5 само по себе не носи многу FPS. Во игри графичката одлучува повеќе. Премин од DDR4 на DDR5 значи нова плоча и нова меморија. Истите пари обично даваат повеќе FPS ако одат во графичката.";
+    return "DDR5 by itself does not add much FPS. In games the graphics card matters more. Moving from DDR4 to DDR5 means a new motherboard and new memory. That money usually adds more FPS if you put it into the graphics card instead.";
+  }
   if (/slow|lag|freeze|бавен|бавно|забав|ngadalt|ngadal/.test(folded)) return pack.slow;
   if (/no (picture|display|signal)|black screen|црн екран|нема слика|без слика|pa pamje|pa sinjal/.test(folded)) return pack.picture;
   if (/overheat|too hot|прегре|nxehet|nxeh|temperature/.test(folded)) return pack.hot;
@@ -495,26 +469,36 @@ export async function* answerChat(locale: Locale, messages: ChatTurn[]): AsyncGe
   if (!geminiKey && !openAiKey) throw new Error("offline");
 
   const question = messages.filter((message) => message.role === "user").at(-1)?.content ?? "";
+  const quick = playbook(question, locale);
+  if (quick) {
+    yield quick;
+    return;
+  }
   if (askedBudget(question) && !askedCategory(question) && /build|pc|склоп|комп|kompj|ndert/i.test(question)) {
     yield await localShopAnswer(locale, [{ role: "user", content: question }]);
     return;
   }
-  const system = systemPrompt(`${await shopBrief()}\n\n${await partsMatching(question)}`.trim(), locale);
+  const needsStock = /price|stock|ден|mkd|buy|which|кој|цена|залих|\d{4}[a-z]{0,2}/i.test(question);
+  const language = locale === "mk" ? "Macedonian" : locale === "sq" ? "Albanian" : "English";
+  const system = needsStock
+    ? systemPrompt(`${await shopBrief()}\n\n${await partsMatching(question)}`.trim(), locale)
+    : `You are the AXON.MK PC assistant. Answer only PC, parts, and IT questions in ${language}. Two short sentences, no asterisks. Refuse anything else in one sentence.`;
   if (geminiKey) {
     const preferred = process.env.GEMINI_MODEL?.trim();
-    const models = preferred ? [preferred] : ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-3.1-flash-lite"];
-    let lastError: unknown;
+    const models = preferred ? [preferred] : ["gemini-3.1-flash-lite"];
     for (const model of models) {
       try {
         yield* geminiText(model, geminiKey, system, messages);
         return;
       } catch (error) {
-        lastError = error;
-        const message = error instanceof Error ? error.message : "";
-        if (!/gemini (404|503|429)/.test(message)) throw error;
+        console.error("[chat]", error);
       }
     }
-    throw lastError;
+    yield locale === "mk"
+      ? "Моментално е бавно. Прашај уште еднаш."
+      : locale === "sq"
+        ? "Është e ngadaltë tani. Pyet edhe një herë."
+        : "That's slow right now. Ask once more.";
   }
   yield* openAiText(system, messages);
 }

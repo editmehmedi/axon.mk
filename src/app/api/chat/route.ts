@@ -69,11 +69,9 @@ export async function POST(req: Request) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
-      let sent = false;
       const write = (text: string) => {
         if (!text) return;
         controller.enqueue(encoder.encode(text));
-        sent = true;
       };
       try {
         for await (const chunk of answerChat(body.locale, body.messages)) {
@@ -81,13 +79,6 @@ export async function POST(req: Request) {
         }
       } catch (error) {
         console.error("[chat]", error);
-      }
-      if (!sent) {
-        try {
-          write(await localShopAnswer(body.locale, body.messages));
-        } catch (error) {
-          console.error("[chat local]", error);
-        }
       }
       try {
         controller.close();
