@@ -39,6 +39,7 @@ import {
   type CompatPart,
   type CompatSelection,
 } from "@/lib/compatibility";
+import { BuildCompatCheck } from "@/components/BuildCompatCheck";
 import { CheckoutModal } from "@/components/CheckoutModal";
 import { FpsEstimatePanel } from "@/components/FpsEstimatePanel";
 import { BottleneckPanel } from "@/components/BottleneckPanel";
@@ -1429,6 +1430,12 @@ export default function ConfiguratorPage() {
             {slotWarning && (
               <p className="mt-2 text-sm font-medium text-[var(--warn)]">{slotWarning}</p>
             )}
+            <BuildCompatCheck
+              selection={selection}
+              ramQty={selectedRamQty}
+              ssdQty={selectedSsdQty}
+              partCount={selectedCount}
+            />
           </div>
 
           <BottleneckPanel

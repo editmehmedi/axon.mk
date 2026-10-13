@@ -238,6 +238,27 @@ async function geminiReply(model: string, key: string, system: string, messages:
   return text;
 }
 
+export async function askGemini(system: string, prompt: string): Promise<string> {
+  const key = process.env.GEMINI_API_KEY?.trim();
+  const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.1-flash-lite";
+  if (!key) {
+    const error = new Error("GEMINI_API_KEY is missing");
+    logGeminiError(error, model);
+    throw error;
+  }
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      return await geminiReply(model, key, system, [{ role: "user", content: prompt }]);
+    } catch (error) {
+      lastError = error;
+      logGeminiError(error, model);
+      if (attempt === 2 || !geminiRetryable(error)) throw error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Gemini request failed");
+}
+
 async function* geminiText(model: string, key: string, system: string, messages: ChatTurn[]): AsyncGenerator<string> {
   if (!key) {
     const error = new Error("GEMINI_API_KEY is missing");
