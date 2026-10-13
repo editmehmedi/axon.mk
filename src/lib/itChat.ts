@@ -509,11 +509,94 @@ function recentChipPair(messages: ChatTurn[]): string[] | null {
   return null;
 }
 
+function recentGame(messages: ChatTurn[]): string | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const game = askedGame(messages[index].content);
+    if (game) return game;
+  }
+  return null;
+}
+
+function ownedChipIds(text: string): string[] {
+  if (!/i have|i've got|\bmy\b|имам|\bimam\b|e kam|\bkam\b/i.test(text)) return [];
+  const ownedPart = text.split(/if u upgrade|if you upgrade|if i upgrade|upgrade to/i)[0];
+  return chipIds(ownedPart);
+}
+
+function answerOneChip(id: string, messages: ChatTurn[], locale: Locale): string {
+  const chip = CHIPS[id];
+  const users = messages.filter((message) => message.role === "user");
+  const earlier = users.slice(0, -1);
+  const game = askedGame(users.at(-1)?.content ?? "") ?? recentGame(messages.slice(0, -1));
+  const current = earlier
+    .flatMap((message) => ownedChipIds(message.content))
+    .map((key) => CHIPS[key])
+    .filter((item) => item.name !== chip.name)
+    .sort((a, b) => b.gaming - a.gaming)[0];
+  const sameBoard = current?.socket === chip.socket;
+  const faster = !current || chip.gaming > current.gaming;
+  const cs2Range = game === "CS2" && id === "7800x3d";
+  if (locale === "mk") {
+    const versus = current
+      ? faster
+        ? `${chip.name} дава повеќе FPS од твојот ${current.name}.`
+        : `${chip.name} нема да ти даде повеќе FPS од твојот ${current.name}.`
+      : `${chip.name} е силен за игри.`;
+    const board = current
+      ? sameBoard
+        ? ` Влегува на истата ${chip.socket} плоча. Ажурирај го BIOS пред замена.`
+        : ` Не влегува на твојата ${current.socket} плоча. Треба ${chip.socket} и ${chip.ram}.`
+      : ` Треба ${chip.socket} плоча и ${chip.ram}.`;
+    const where = game ? ` Во ${game} на 1080p разликата е поголема кога графичката не е граница.` : " Точниот FPS зависи од играта и графичката.";
+    const range = cs2Range
+      ? " Со брза графичка и натпреварувачки поставки, CS2 на 1080p често е околу 400–700 FPS. Послаба картичка ја спушта таа бројка."
+      : " Кажи ја графичката и ќе ја стеснам бројката.";
+    return `${versus}${board}${where}${range}`;
+  }
+  if (locale === "sq") {
+    const versus = current
+      ? faster
+        ? `${chip.name} jep më shumë FPS se ${current.name} që e ke.`
+        : `${chip.name} nuk të jep më shumë FPS se ${current.name} që e ke.`
+      : `${chip.name} është i fortë për lojëra.`;
+    const board = current
+      ? sameBoard
+        ? ` Hyn në të njëjtën pllakë ${chip.socket}. Përditëso BIOS para ndërrimit.`
+        : ` Nuk hyn në pllakën tënde ${current.socket}. Duhet ${chip.socket} dhe ${chip.ram}.`
+      : ` Duhet një pllakë ${chip.socket} dhe ${chip.ram}.`;
+    const where = game ? ` Në ${game} në 1080p diferenca është më e madhe kur kartela nuk është kufiri.` : " FPS-ja e saktë varet nga loja dhe kartela.";
+    const range = cs2Range
+      ? " Me një kartelë të shpejtë dhe cilësime garash, CS2 në 1080p shpesh është rreth 400–700 FPS. Një kartelë më e dobët e ul atë numër."
+      : " Më thuaj kartelën dhe e ngushtoj numrin.";
+    return `${versus}${board}${where}${range}`;
+  }
+  const versus = current
+    ? faster
+      ? `A ${chip.name} gives more FPS than your ${current.name}.`
+      : `A ${chip.name} will not give you more FPS than your ${current.name}.`
+    : `A ${chip.name} is a strong gaming CPU.`;
+  const board = current
+    ? sameBoard
+      ? ` It fits the same ${chip.socket} motherboard. Update the BIOS before you swap.`
+      : ` It does not fit your ${current.socket} board. It needs ${chip.socket} and ${chip.ram}.`
+    : ` It needs a motherboard with ${chip.socket} and ${chip.ram}.`;
+  const where = game
+    ? ` In ${game} at 1080p the gain is larger when the graphics card is not the limit.`
+    : " The exact FPS depends on the game and the graphics card.";
+  const range = cs2Range
+    ? " With a fast graphics card and competitive settings, CS2 at 1080p is often about 400–700 FPS. A weaker card sets a lower number."
+    : " Tell me the graphics card and I can narrow the number.";
+  return `${versus}${board}${where}${range}`;
+}
+
 function compareCpus(messages: ChatTurn[], locale: Locale): string | null {
   const users = messages.filter((message) => message.role === "user");
   const question = users.at(-1)?.content ?? "";
   let ids = chipIds(question);
-  const game = askedGame(question);
+  const game = askedGame(question) ?? (ids.length < 2 ? recentGame(messages.slice(0, -1)) : null);
+  if (ids.length === 1 && wantsFpsCompare(question)) {
+    return answerOneChip(ids[0], messages, locale);
+  }
   if (ids.length < 2) {
     if (!wantsFpsCompare(question)) return null;
     const pair = recentChipPair(users.slice(0, -1));
